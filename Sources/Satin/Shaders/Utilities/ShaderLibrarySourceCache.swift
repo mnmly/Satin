@@ -7,10 +7,33 @@
 
 import Foundation
 
+// MARK: - Custom Injection Protocol
+public protocol CustomShaderInjector {
+    func injectCustomCode(source: inout String, configuration: ShaderLibraryConfiguration)
+}
+
 public final class ShaderLibrarySourceCache: Sendable {
     private nonisolated(unsafe) static var cache: [ShaderLibraryConfiguration: String] = [:]
 
     private static let queue = DispatchQueue(label: "ShaderLibrarySourceCacheQueue", attributes: .concurrent)
+
+    // MARK: - Custom injector registry
+    private nonisolated(unsafe) static var customInjectors: [String: CustomShaderInjector] = [:]
+    private static let injectorsQueue = DispatchQueue(label: "ShaderLibrarySourceCacheInjectorsQueue", attributes: .concurrent)
+    
+    // MARK: - Register custom injector
+    public static func registerCustomInjector(_ injector: CustomShaderInjector, for materialType: String) {
+        injectorsQueue.sync(flags: .barrier) {
+            customInjectors[materialType] = injector
+        }
+    }
+    
+    // MARK: - Unregister custom injector
+    public static func unregisterCustomInjector(for materialType: String) {
+        injectorsQueue.sync(flags: .barrier) {
+            customInjectors.removeValue(forKey: materialType)
+        }
+    }
 
     static func invalidateLibrarySource(configuration: ShaderLibraryConfiguration) {
         queue.sync(flags: .barrier) {
@@ -133,6 +156,8 @@ public final class ShaderLibrarySourceCache: Sendable {
             lighting: configuration.lighting
         )
 
+        injectCustomCode(source: &source, configuration: configuration)
+        
         queue.sync(flags: .barrier) {
             cache[configuration] = source
         }
@@ -140,5 +165,22 @@ public final class ShaderLibrarySourceCache: Sendable {
 //        print(source)
 
         return source
+    }
+
+    // MARK: Custom injection method
+    private static func injectCustomCode(source: inout String, configuration: ShaderLibraryConfiguration) {
+        var availableInjectors: [String: CustomShaderInjector] = [:]
+        
+        injectorsQueue.sync {
+            availableInjectors = customInjectors
+        }
+        
+        if let injector = availableInjectors[configuration.label] {
+            injector.injectCustomCode(source: &source, configuration: configuration)
+        }
+        
+        if let globalInjector = availableInjectors["*"] {
+            globalInjector.injectCustomCode(source: &source, configuration: configuration)
+        }
     }
 }

@@ -260,6 +260,8 @@ open class Mesh: Object, Renderable {
     }
 
     override open func update(renderContext: Context, camera: Camera, viewport: simd_float4, index: Int) {
+        updateLOD(camera: camera, viewport: viewport)
+        
         vertexUniforms[renderContext]?.update(
             object: self,
             camera: camera,

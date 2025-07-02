@@ -87,4 +87,8 @@ open class SourceShader: Shader {
         compiler = ShaderSourceCache.getCompiler(url: pipelineURL)
         compiler.watch = live
     }
+
+    public func recompile() {
+        compiler.touch()
+    }
 }

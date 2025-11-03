@@ -141,17 +141,17 @@ extension MTLVertexFormat {
             case .char4:
                 return "char4"
             case .uchar2Normalized:
-                return "uchar2"
+                return "float2"
             case .uchar3Normalized:
-                return "uchar3"
+                return "float3"
             case .uchar4Normalized:
-                return "uchar4"
+                return "float4"
             case .char2Normalized:
-                return "uchar2"
+                return "float2"
             case .char3Normalized:
-                return "char3"
+                return "float3"
             case .char4Normalized:
-                return "char4"
+                return "float4"
             case .ushort2:
                 return "ushort2"
             case .ushort3:
@@ -165,17 +165,17 @@ extension MTLVertexFormat {
             case .short4:
                 return "short4"
             case .ushort2Normalized:
-                return "ushort2"
+                return "float2"
             case .ushort3Normalized:
-                return "ushort3"
+                return "float3"
             case .ushort4Normalized:
-                return "ushort4"
+                return "float4"
             case .short2Normalized:
-                return "short2"
+                return "float2"
             case .short3Normalized:
-                return "short3"
+                return "float3"
             case .short4Normalized:
-                return "short4"
+                return "float4"
             case .half2:
                 return "half2"
             case .half3:
@@ -207,27 +207,27 @@ extension MTLVertexFormat {
             case .uint4:
                 return "uint4"
             case .int1010102Normalized:
-                return "float"
+                return "float4"
             case .uint1010102Normalized:
-                return "float"
+                return "float4"
             case .uchar4Normalized_bgra:
-                return "uchar4"
+                return "float4"
             case .uchar:
                 return "uchar"
             case .char:
                 return "char"
             case .ucharNormalized:
-                return "uchar"
+                return "float"
             case .charNormalized:
-                return "char"
+                return "float"
             case .ushort:
                 return "ushort"
             case .short:
                 return "short"
             case .ushortNormalized:
-                return "ushort"
+                return "float"
             case .shortNormalized:
-                return "short"
+                return "float"
             case .half:
                 return "half"
             case .floatRG11B10:

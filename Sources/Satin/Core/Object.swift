@@ -17,7 +17,7 @@ import SatinCore
 
 open class Object: Codable {
     public let idPublisher = PassthroughSubject<String, Never>()
-    var id: String = UUID().uuidString {
+    public private(set) var id: String = UUID().uuidString {
         didSet {
             idPublisher.send(id)
         }

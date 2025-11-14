@@ -198,7 +198,7 @@ open class ComputeProcessor: ComputeShaderDelegate {
 
     // MARK: - Dispatch
 
-    func dispatch(computeEncoder: MTLComputeCommandEncoder, pipeline: MTLComputePipelineState, iteration: Int) {
+    open func dispatch(computeEncoder: MTLComputeCommandEncoder, pipeline: MTLComputePipelineState, iteration: Int) {
 #if os(macOS) || os(iOS) || os(visionOS)
         if _useDispatchThreads {
             dispatchThreads(computeEncoder: computeEncoder, pipeline: pipeline, iteration: iteration)
@@ -238,7 +238,7 @@ open class ComputeProcessor: ComputeShaderDelegate {
         )
     }
 
-    func bindBuffers(_ computeEncoder: MTLComputeCommandEncoder) {
+    open func bindBuffers(_ computeEncoder: MTLComputeCommandEncoder) {
         guard let shader else { return }
 
         for index in shader.bufferBindingIsUsed {
@@ -264,7 +264,7 @@ open class ComputeProcessor: ComputeShaderDelegate {
         }
     }
 
-    func bindTextures(_ computeEncoder: MTLComputeCommandEncoder) {
+    open func bindTextures(_ computeEncoder: MTLComputeCommandEncoder) {
         guard let shader else { return }
 
         for index in shader.textureBindingIsUsed {

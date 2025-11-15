@@ -419,6 +419,10 @@ open class ComputeShader {
         let clone: ComputeShader = type(of: self).init(configuration: configuration)
         return clone
     }
+
+    public func recompile() {
+        compiler.touch()
+    }
 }
 
 extension ComputeShader: Equatable {

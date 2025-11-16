@@ -28,9 +28,16 @@ public protocol TouchDelegate: AnyObject {
     func touchesCancelled(with event: NSEvent)
 }
 
+public protocol KeyboardDelegate: AnyObject {
+    func keyDown(with event: NSEvent)
+    func keyUp(with event: NSEvent)
+    func flagsChanged(with event: NSEvent)
+}
+
 public final class MetalView: NSView, CALayerDelegate {
     public weak var dragDelegate: DragDelegate?
     public weak var touchDelegate: TouchDelegate?
+    public weak var keyboardDelegate: KeyboardDelegate?
 
     public var isPaused: Bool {
         get {
@@ -370,6 +377,20 @@ public final class MetalView: NSView, CALayerDelegate {
 
     override public func touchesCancelled(with event: NSEvent) {
         touchDelegate?.touchesCancelled(with: event)
+    }
+
+    // MARK: - Keyboard
+
+    override public func keyDown(with event: NSEvent) {
+        keyboardDelegate?.keyDown(with: event)
+    }
+
+    override public func keyUp(with event: NSEvent) {
+        keyboardDelegate?.keyUp(with: event)
+    }
+
+    override public func flagsChanged(with event: NSEvent) {
+        keyboardDelegate?.flagsChanged(with: event)
     }
 }
 

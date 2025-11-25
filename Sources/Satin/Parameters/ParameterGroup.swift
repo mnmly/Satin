@@ -11,9 +11,17 @@ import Foundation
 import Metal
 import simd
 
-public final class ParameterGroup: Codable, CustomStringConvertible {
+public final class ParameterGroup: Codable, CustomStringConvertible, CustomDebugStringConvertible {
     public let id: String = UUID().uuidString
 
+    public var debugDescription: String {
+        var dsc = "\(type(of: self)): \(label)\n"
+        for param in params {
+            dsc += param.debugDescription + "\n"
+        }
+        return dsc
+    }
+    
     public var description: String {
         var dsc = "\(type(of: self)): \(label)\n"
         for param in params {

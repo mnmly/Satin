@@ -103,7 +103,7 @@ open class ComputeProcessor: ComputeShaderDelegate {
     }
 
     var _reset = true
-    var _index = 0
+    open var _index = 0
     var _count = 0
     var _useDispatchThreads = false
 

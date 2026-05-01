@@ -59,6 +59,22 @@ open class Material: Codable {
         set { renderingConfiguration.tessellationDescriptor = newValue }
     }
 
+    /// Custom shader source transforms forwarded to the underlying `Shader`.
+    /// If no shader exists yet, transforms are buffered locally and applied
+    /// when the shader is attached.
+    public var sourceTransforms: [ShaderSourceTransform] {
+        get { shader?.sourceTransforms ?? _pendingSourceTransforms }
+        set {
+            if let shader {
+                shader.sourceTransforms = newValue
+                _pendingSourceTransforms = []
+            } else {
+                _pendingSourceTransforms = newValue
+            }
+        }
+    }
+    private var _pendingSourceTransforms: [ShaderSourceTransform] = []
+
     private var parametersSubscription: AnyCancellable?
 
     public private(set) var shader: Shader? {
@@ -66,6 +82,10 @@ open class Material: Codable {
             if shader != oldValue, let shader = shader {
                 setupShaderRenderingConfiguration(shader)
                 setupShaderParametersSubscription(shader)
+                if !_pendingSourceTransforms.isEmpty {
+                    shader.sourceTransforms = _pendingSourceTransforms
+                    _pendingSourceTransforms = []
+                }
             }
         }
     }

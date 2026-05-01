@@ -47,6 +47,10 @@ public final class ComputeShaderLibrarySourceCache: Sendable {
 
         source += shaderSource
 
+        for transform in configuration.sourceTransforms {
+            transform.transform(source: &source, configuration: configuration)
+        }
+
         queue.sync(flags: .barrier) {
             cache[configuration] = source
         }

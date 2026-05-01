@@ -100,6 +100,21 @@ open class ComputeShader {
         set { configuration.compute.defines = newValue }
     }
 
+    /// User-provided transforms applied at the end of compute shader source
+    /// generation. Order is significant — transforms run in array order.
+    /// Mutating this property invalidates cached source/library/pipelines.
+    public var sourceTransforms: [ComputeShaderSourceTransform] {
+        get { configuration.sourceTransforms }
+        set {
+            configuration.sourceTransforms = newValue
+            configuration.sourceTransformIdentity = newValue.isEmpty ? nil : UUID()
+            resetPipelineNeedsUpdate = true
+            updatePipelineNeedsUpdate = true
+            parametersNeedsUpdate = true
+            buffersNeedsUpdate = true
+        }
+    }
+
     public var resetFunctionName: String {
         get { configuration.resetFunctionName }
         set { configuration.resetFunctionName = newValue }

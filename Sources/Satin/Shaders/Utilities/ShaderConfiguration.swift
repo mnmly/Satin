@@ -27,6 +27,10 @@ public struct ShaderConfiguration {
     public internal(set) var defines: [ShaderDefine] = []
     public internal(set) var constants: [String] = []
 
+    // Custom source transforms (excluded from hash/eq; identity drives invalidation).
+    public internal(set) var sourceTransforms: [ShaderSourceTransform] = []
+    public internal(set) var sourceTransformIdentity: UUID? = nil
+
     public var blending: ShaderBlending {
         rendering.blending
     }
@@ -68,7 +72,9 @@ public struct ShaderConfiguration {
             directShadowCount: rendering.directShadowCount,
             directShadowTextureCount: rendering.directShadowTextureCount,
             defines: resolvedDefines,
-            constants: resolvedConstants
+            constants: resolvedConstants,
+            sourceTransforms: sourceTransforms,
+            sourceTransformIdentity: sourceTransformIdentity
         )
     }
 }
@@ -84,7 +90,8 @@ extension ShaderConfiguration: Equatable {
             lhs.pipelineURL == rhs.pipelineURL &&
             lhs.defines == rhs.defines &&
             lhs.constants == rhs.constants &&
-            lhs.rendering == rhs.rendering
+            lhs.rendering == rhs.rendering &&
+            lhs.sourceTransformIdentity == rhs.sourceTransformIdentity
     }
 }
 
@@ -103,6 +110,7 @@ extension ShaderConfiguration: Hashable {
         hasher.combine(defines)
         hasher.combine(constants)
         hasher.combine(rendering)
+        if let sourceTransformIdentity { hasher.combine(sourceTransformIdentity) }
     }
 }
 

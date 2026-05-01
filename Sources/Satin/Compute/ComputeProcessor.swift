@@ -44,6 +44,10 @@ open class ComputeProcessor: ComputeShaderDelegate {
                 reset()
                 setupShaderConfiguration(shader)
                 setupShaderParametersSubscription(shader)
+                if !_pendingSourceTransforms.isEmpty {
+                    shader.sourceTransforms = _pendingSourceTransforms
+                    _pendingSourceTransforms = []
+                }
             }
         }
     }
@@ -65,6 +69,21 @@ open class ComputeProcessor: ComputeShaderDelegate {
         get { configuration.constants }
         set { configuration.constants = newValue }
     }
+
+    /// Custom compute shader source transforms forwarded to the underlying
+    /// `ComputeShader`. Buffered locally until the shader is attached.
+    public var sourceTransforms: [ComputeShaderSourceTransform] {
+        get { shader?.sourceTransforms ?? _pendingSourceTransforms }
+        set {
+            if let shader {
+                shader.sourceTransforms = newValue
+                _pendingSourceTransforms = []
+            } else {
+                _pendingSourceTransforms = newValue
+            }
+        }
+    }
+    private var _pendingSourceTransforms: [ComputeShaderSourceTransform] = []
 
     public private(set) var uniforms: UniformBuffer?
     private var uniformsNeedsUpdate = true
@@ -198,7 +217,7 @@ open class ComputeProcessor: ComputeShaderDelegate {
 
     // MARK: - Dispatch
 
-    func dispatch(computeEncoder: MTLComputeCommandEncoder, pipeline: MTLComputePipelineState, iteration: Int) {
+    open func dispatch(computeEncoder: MTLComputeCommandEncoder, pipeline: MTLComputePipelineState, iteration: Int) {
 #if os(macOS) || os(iOS) || os(visionOS)
         if _useDispatchThreads {
             dispatchThreads(computeEncoder: computeEncoder, pipeline: pipeline, iteration: iteration)
@@ -238,7 +257,7 @@ open class ComputeProcessor: ComputeShaderDelegate {
         )
     }
 
-    func bindBuffers(_ computeEncoder: MTLComputeCommandEncoder) {
+    open func bindBuffers(_ computeEncoder: MTLComputeCommandEncoder) {
         guard let shader else { return }
 
         for index in shader.bufferBindingIsUsed {
@@ -264,7 +283,7 @@ open class ComputeProcessor: ComputeShaderDelegate {
         }
     }
 
-    func bindTextures(_ computeEncoder: MTLComputeCommandEncoder) {
+    open func bindTextures(_ computeEncoder: MTLComputeCommandEncoder) {
         guard let shader else { return }
 
         for index in shader.textureBindingIsUsed {

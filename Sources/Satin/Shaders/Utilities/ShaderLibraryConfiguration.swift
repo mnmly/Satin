@@ -33,6 +33,15 @@ public struct ShaderLibraryConfiguration {
 
     var defines: [ShaderDefine]
     var constants: [String]
+
+    // Custom source transforms — applied at end of source generation.
+    // The array itself is excluded from hash/equality; `sourceTransformIdentity`
+    // is a per-shader nonce that participates in the cache key. `nil` means no
+    // transforms (so configs without transforms hit the global cache freely);
+    // otherwise it disambiguates configs that are otherwise identical but have
+    // different transform sets.
+    var sourceTransforms: [ShaderSourceTransform] = []
+    var sourceTransformIdentity: UUID? = nil
 }
 
 extension ShaderLibraryConfiguration: Equatable {
@@ -50,7 +59,8 @@ extension ShaderLibraryConfiguration: Equatable {
             lhs.directShadowCount == rhs.directShadowCount &&
             lhs.directShadowTextureCount == rhs.directShadowTextureCount &&
             lhs.defines == rhs.defines &&
-            lhs.constants == rhs.constants
+            lhs.constants == rhs.constants &&
+            lhs.sourceTransformIdentity == rhs.sourceTransformIdentity
     }
 }
 
@@ -74,5 +84,6 @@ extension ShaderLibraryConfiguration: Hashable {
 
         if !defines.isEmpty { hasher.combine(defines) }
         if !constants.isEmpty { hasher.combine(constants) }
+        if let sourceTransformIdentity { hasher.combine(sourceTransformIdentity) }
     }
 }

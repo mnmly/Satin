@@ -16,6 +16,15 @@ public struct ComputeShaderLibraryConfiguration {
 
     var defines: [ShaderDefine]
     var constants: [String]
+
+    // Custom source transforms — applied at end of source generation.
+    // The array itself is excluded from hash/equality; `sourceTransformIdentity`
+    // is a per-shader nonce that participates in the cache key. `nil` means no
+    // transforms (so configs without transforms hit the global cache freely);
+    // otherwise it disambiguates configs that are otherwise identical but have
+    // different transform sets.
+    var sourceTransforms: [ComputeShaderSourceTransform] = []
+    var sourceTransformIdentity: UUID? = nil
 }
 
 extension ComputeShaderLibraryConfiguration: Equatable {
@@ -24,7 +33,8 @@ extension ComputeShaderLibraryConfiguration: Equatable {
             lhs.libraryURL == rhs.libraryURL &&
             lhs.pipelineURL == rhs.pipelineURL &&
             lhs.defines == rhs.defines &&
-            lhs.constants == rhs.constants
+            lhs.constants == rhs.constants &&
+            lhs.sourceTransformIdentity == rhs.sourceTransformIdentity
     }
 }
 
@@ -37,5 +47,6 @@ extension ComputeShaderLibraryConfiguration: Hashable {
 
         if !defines.isEmpty { hasher.combine(defines) }
         if !constants.isEmpty { hasher.combine(constants) }
+        if let sourceTransformIdentity { hasher.combine(sourceTransformIdentity) }
     }
 }

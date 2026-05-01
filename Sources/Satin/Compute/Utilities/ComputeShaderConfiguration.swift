@@ -23,6 +23,10 @@ public struct ComputeShaderConfiguration {
 
     public internal(set) var compute = ComputeConfiguration()
 
+    // Custom source transforms (excluded from hash/eq; identity drives invalidation).
+    public internal(set) var sourceTransforms: [ComputeShaderSourceTransform] = []
+    public internal(set) var sourceTransformIdentity: UUID? = nil
+
     public init(
         label: String = "",
         resetFunctionName: String = "",
@@ -43,7 +47,9 @@ public struct ComputeShaderConfiguration {
             libraryURL: libraryURL,
             pipelineURL: pipelineURL,
             defines: compute.getDefines(),
-            constants: compute.getConstants()
+            constants: compute.getConstants(),
+            sourceTransforms: sourceTransforms,
+            sourceTransformIdentity: sourceTransformIdentity
         )
     }
 }
@@ -56,7 +62,8 @@ extension ComputeShaderConfiguration: Equatable {
             lhs.updateFunctionName == rhs.updateFunctionName &&
             lhs.libraryURL == rhs.libraryURL &&
             lhs.pipelineURL == rhs.pipelineURL &&
-            lhs.compute == rhs.compute
+            lhs.compute == rhs.compute &&
+            lhs.sourceTransformIdentity == rhs.sourceTransformIdentity
     }
 }
 
@@ -71,6 +78,7 @@ extension ComputeShaderConfiguration: Hashable {
         if let pipelineURL = pipelineURL { hasher.combine(pipelineURL) }
 
         hasher.combine(compute)
+        if let sourceTransformIdentity { hasher.combine(sourceTransformIdentity) }
     }
 }
 

@@ -140,6 +140,20 @@ open class Shader {
         }
     }
 
+    // MARK: - Source Transforms
+
+    /// User-provided transforms applied at the end of shader source generation.
+    /// Order is significant — transforms run in array order. Mutating this
+    /// property invalidates cached source/library/pipelines for this shader.
+    public var sourceTransforms: [ShaderSourceTransform] {
+        get { configuration.sourceTransforms }
+        set {
+            configuration.sourceTransforms = newValue
+            configuration.sourceTransformIdentity = newValue.isEmpty ? nil : UUID()
+            configurationNeedsUpdate = true
+        }
+    }
+
     // MARK: - Blending
 
     public var blending: Blending {

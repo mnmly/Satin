@@ -92,6 +92,10 @@ public final class ShaderLibrarySourceCache: Sendable {
             directShadowTextureCount: configuration.directShadowTextureCount
         )
 
+        for transform in configuration.sourceTransforms {
+            transform.transform(source: &source, configuration: configuration)
+        }
+
         queue.sync(flags: .barrier) {
             cache[configuration] = source
         }

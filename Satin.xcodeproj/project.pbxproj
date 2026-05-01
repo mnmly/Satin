@@ -84,6 +84,8 @@
 		E101A8AF2C070E8E0055FABA /* ComputeShaderLibraryCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66D7DD602C06A24B00B5A6C8 /* ComputeShaderLibraryCache.swift */; };
 		E101A8B02C070E8E0055FABA /* ComputeShaderLibraryConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66D7DD612C06A24B00B5A6C8 /* ComputeShaderLibraryConfiguration.swift */; };
 		E101A8B12C070E8E0055FABA /* ComputeShaderLibrarySourceCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66D7DD622C06A24B00B5A6C8 /* ComputeShaderLibrarySourceCache.swift */; };
+		107CF57813984103BCE39452 /* ComputeShaderSourceTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 297BC1D666154067889FF2C3 /* ComputeShaderSourceTransform.swift */; };
+		A21FC82F571642DB82293871 /* ShaderSourceTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673EF840EF2A4F7BB43101A0 /* ShaderSourceTransform.swift */; };
 		E101A8B22C070E8E0055FABA /* ComputeShaderPipelineCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66D7DD632C06A24B00B5A6C8 /* ComputeShaderPipelineCache.swift */; };
 		E101A8B32C070E8E0055FABA /* BufferComputeSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66D7DD652C06A24B00B5A6C8 /* BufferComputeSystem.swift */; };
 		E101A8B42C070E8E0055FABA /* ComputeSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66D7DD662C06A24B00B5A6C8 /* ComputeSystem.swift */; };
@@ -342,6 +344,8 @@
 		66D7DD602C06A24B00B5A6C8 /* ComputeShaderLibraryCache.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ComputeShaderLibraryCache.swift; sourceTree = "<group>"; };
 		66D7DD612C06A24B00B5A6C8 /* ComputeShaderLibraryConfiguration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ComputeShaderLibraryConfiguration.swift; sourceTree = "<group>"; };
 		66D7DD622C06A24B00B5A6C8 /* ComputeShaderLibrarySourceCache.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ComputeShaderLibrarySourceCache.swift; sourceTree = "<group>"; };
+		297BC1D666154067889FF2C3 /* ComputeShaderSourceTransform.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ComputeShaderSourceTransform.swift; sourceTree = "<group>"; };
+		673EF840EF2A4F7BB43101A0 /* ShaderSourceTransform.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShaderSourceTransform.swift; sourceTree = "<group>"; };
 		66D7DD632C06A24B00B5A6C8 /* ComputeShaderPipelineCache.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ComputeShaderPipelineCache.swift; sourceTree = "<group>"; };
 		66D7DD652C06A24B00B5A6C8 /* BufferComputeSystem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BufferComputeSystem.swift; sourceTree = "<group>"; };
 		66D7DD662C06A24B00B5A6C8 /* ComputeSystem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ComputeSystem.swift; sourceTree = "<group>"; };
@@ -698,6 +702,7 @@
 				66D7DD612C06A24B00B5A6C8 /* ComputeShaderLibraryConfiguration.swift */,
 				66D7DD622C06A24B00B5A6C8 /* ComputeShaderLibrarySourceCache.swift */,
 				66D7DD632C06A24B00B5A6C8 /* ComputeShaderPipelineCache.swift */,
+				297BC1D666154067889FF2C3 /* ComputeShaderSourceTransform.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -977,6 +982,7 @@
 				66D7DEB72C06A24B00B5A6C8 /* ShaderSourceCache.swift */,
 				66D7DEB82C06A24B00B5A6C8 /* ShaderSourceInjections.swift */,
 				66D7DEB92C06A24B00B5A6C8 /* ShaderSourceParsers.swift */,
+				673EF840EF2A4F7BB43101A0 /* ShaderSourceTransform.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -1421,6 +1427,8 @@
 				E101A8B02C070E8E0055FABA /* ComputeShaderLibraryConfiguration.swift in Sources */,
 				E10A52D52C581CE300BB537A /* CodingUserInfoKey+Extensions.swift in Sources */,
 				E101A8B12C070E8E0055FABA /* ComputeShaderLibrarySourceCache.swift in Sources */,
+				107CF57813984103BCE39452 /* ComputeShaderSourceTransform.swift in Sources */,
+				A21FC82F571642DB82293871 /* ShaderSourceTransform.swift in Sources */,
 				1B7FEE222F9944B00075DA16 /* SsaoCompositeMaterial.swift in Sources */,
 				E101A8B22C070E8E0055FABA /* ComputeShaderPipelineCache.swift in Sources */,
 				E101A8B32C070E8E0055FABA /* BufferComputeSystem.swift in Sources */,

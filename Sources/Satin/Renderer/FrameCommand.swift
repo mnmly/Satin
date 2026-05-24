@@ -7,14 +7,17 @@
 
 import Metal
 
-internal protocol SatinFrameCommand {
+public protocol SatinFrameCommand: AnyObject {
     var backend: MetalBackend { get }
     var frameIndex: Int { get }
+}
+
+internal protocol SatinCommittableFrameCommand: SatinFrameCommand {
     func commit()
     func commit(onCompleted: (() -> Void)?)
 }
 
-internal final class MetalFrameCommand: SatinFrameCommand {
+internal final class MetalFrameCommand: SatinCommittableFrameCommand {
     let backend: MetalBackend = .metal3
     let frameIndex: Int
     let commandBuffer: MTLCommandBuffer
@@ -39,7 +42,7 @@ internal final class MetalFrameCommand: SatinFrameCommand {
 }
 
 @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
-internal final class Metal4FrameCommand: SatinFrameCommand {
+internal final class Metal4FrameCommand: SatinCommittableFrameCommand {
     let backend: MetalBackend = .metal4
     let frameIndex: Int
     let commandQueue: any MTL4CommandQueue

@@ -467,9 +467,9 @@ open class RenderEncoder {
     }
 
     @discardableResult
-    internal func draw(
+    public func draw(
         renderPassDescriptor: MTLRenderPassDescriptor,
-        frameCommand: SatinFrameCommand,
+        frameCommand: any SatinFrameCommand,
         scene: Object,
         camera: Camera,
         viewport: MTLViewport? = nil
@@ -484,9 +484,9 @@ open class RenderEncoder {
     }
 
     @discardableResult
-    internal func draw(
+    public func draw(
         renderPassDescriptor: MTLRenderPassDescriptor,
-        frameCommand: SatinFrameCommand,
+        frameCommand: any SatinFrameCommand,
         scene: Object,
         cameras: [Camera],
         viewports: [MTLViewport],

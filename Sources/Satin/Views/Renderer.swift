@@ -87,7 +87,8 @@ open class Renderer {
         _ = inFlightSemaphore.wait(timeout: DispatchTime.distantFuture)
     }
 
-    func commitFrameCommand(_ frameCommand: SatinFrameCommand) {
+    func commitFrameCommand(_ frameCommand: any SatinFrameCommand) {
+        guard let frameCommand = frameCommand as? any SatinCommittableFrameCommand else { return }
         inFlightSemaphoreWait += 1
         frameCommand.commit { [weak self] in
             self?.inFlightSemaphore.signal()
@@ -106,7 +107,7 @@ open class Renderer {
         return nil
     }
 
-    internal func makeFrameCommand() -> SatinFrameCommand? {
+    internal func makeFrameCommand() -> (any SatinFrameCommand)? {
         waitForAvailableFrameSlot()
         frameIndex += 1
 
@@ -120,6 +121,10 @@ open class Renderer {
 
         guard let commandBuffer = commandQueue.makeCommandBuffer() else { return nil }
         return MetalFrameCommand(frameIndex: frameIndex, commandBuffer: commandBuffer)
+    }
+
+    open func preDrawFrameCommand() -> (any SatinFrameCommand)? {
+        makeFrameCommand()
     }
 
     open func preDraw() -> MTLCommandBuffer? {
@@ -154,8 +159,19 @@ open class Renderer {
 
     open func draw(renderPassDescriptor: MTLRenderPassDescriptor, commandBuffer: MTLCommandBuffer) {}
 
+    @discardableResult
+    open func draw(texture: MTLTexture, frameCommand: any SatinFrameCommand) -> Bool {
+        guard let frameCommand = frameCommand as? MetalFrameCommand else { return false }
+        draw(texture: texture, commandBuffer: frameCommand.commandBuffer)
+        return true
+    }
+
     open func postDraw(commandBuffer: MTLCommandBuffer) {
         commitFrameCommand(MetalFrameCommand(frameIndex: frameIndex, commandBuffer: commandBuffer))
+    }
+
+    open func postDraw(frameCommand: any SatinFrameCommand) {
+        commitFrameCommand(frameCommand)
     }
 
     open func setup() {}

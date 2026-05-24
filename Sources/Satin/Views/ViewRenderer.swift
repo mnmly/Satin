@@ -42,6 +42,24 @@ open class ViewRenderer: Renderer, ViewRendererDelegate {
         postDraw(commandBuffer: commandBuffer)
     }
 
+    open func postDraw(drawable: CAMetalDrawable, frameCommand: any SatinFrameCommand) {
+        if let frameCommand = frameCommand as? MetalFrameCommand {
+            postDraw(drawable: drawable, commandBuffer: frameCommand.commandBuffer)
+            return
+        }
+
+        if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
+           let frameCommand = frameCommand as? Metal4FrameCommand
+        {
+            postDraw(frameCommand: frameCommand)
+            frameCommand.commandQueue.signalDrawable(drawable)
+            drawable.present()
+            return
+        }
+
+        postDraw(frameCommand: frameCommand)
+    }
+
     // MARK: - Events
 
 #if os(macOS)
@@ -109,11 +127,15 @@ open class ViewRenderer: Renderer, ViewRendererDelegate {
     // MARK: - ViewRendererDelegate
 
     func draw(metalLayer: CAMetalLayer, drawable: CAMetalDrawable) {
-        guard isSetup, let commandBuffer = preDraw() else { return }
+        guard isSetup, let frameCommand = preDrawFrameCommand() else { return }
 
         update()
-        draw(texture: drawable.texture, commandBuffer: commandBuffer)
-        postDraw(drawable: drawable, commandBuffer: commandBuffer)
+        let didDraw = draw(texture: drawable.texture, frameCommand: frameCommand)
+        if didDraw {
+            postDraw(drawable: drawable, frameCommand: frameCommand)
+        } else {
+            postDraw(frameCommand: frameCommand)
+        }
     }
 
     func drawableResized(size: CGSize, scaleFactor: CGFloat) {

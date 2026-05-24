@@ -23,6 +23,10 @@ public final class RenderEncoderState {
         classicRenderEncoder != nil
     }
 
+    var supportsTessellation: Bool {
+        commands.supportsTessellation
+    }
+
     public var cullMode: MTLCullMode? {
         didSet {
             if oldValue != cullMode, let cullMode {
@@ -239,6 +243,60 @@ public final class RenderEncoderState {
             indexBufferOffset: indexBufferOffset,
             instanceCount: instanceCount
         )
+    }
+
+    public func setTessellationFactorBuffer(_ buffer: MTLBuffer, offset: Int, instanceStride: Int) -> Bool {
+        guard commands.supportsTessellation else { return false }
+        commands.setTessellationFactorBuffer(buffer, offset: offset, instanceStride: instanceStride)
+        return true
+    }
+
+    public func drawPatches(
+        numberOfPatchControlPoints: Int,
+        patchStart: Int,
+        patchCount: Int,
+        patchIndexBuffer: MTLBuffer?,
+        patchIndexBufferOffset: Int,
+        instanceCount: Int,
+        baseInstance: Int
+    ) -> Bool {
+        guard commands.supportsTessellation else { return false }
+        commands.drawPatches(
+            numberOfPatchControlPoints: numberOfPatchControlPoints,
+            patchStart: patchStart,
+            patchCount: patchCount,
+            patchIndexBuffer: patchIndexBuffer,
+            patchIndexBufferOffset: patchIndexBufferOffset,
+            instanceCount: instanceCount,
+            baseInstance: baseInstance
+        )
+        return true
+    }
+
+    public func drawIndexedPatches(
+        numberOfPatchControlPoints: Int,
+        patchStart: Int,
+        patchCount: Int,
+        patchIndexBuffer: MTLBuffer?,
+        patchIndexBufferOffset: Int,
+        controlPointIndexBuffer: MTLBuffer,
+        controlPointIndexBufferOffset: Int,
+        instanceCount: Int,
+        baseInstance: Int
+    ) -> Bool {
+        guard commands.supportsTessellation else { return false }
+        commands.drawIndexedPatches(
+            numberOfPatchControlPoints: numberOfPatchControlPoints,
+            patchStart: patchStart,
+            patchCount: patchCount,
+            patchIndexBuffer: patchIndexBuffer,
+            patchIndexBufferOffset: patchIndexBufferOffset,
+            controlPointIndexBuffer: controlPointIndexBuffer,
+            controlPointIndexBufferOffset: controlPointIndexBufferOffset,
+            instanceCount: instanceCount,
+            baseInstance: baseInstance
+        )
+        return true
     }
 
     init(renderEncoder: MTLRenderCommandEncoder) {

@@ -8,6 +8,8 @@
 import Metal
 
 internal protocol SatinRenderCommandEncoder {
+    var supportsTessellation: Bool { get }
+
     func setCullMode(_ cullMode: MTLCullMode)
     func setFrontFacing(_ windingOrder: MTLWinding)
     func setTriangleFillMode(_ triangleFillMode: MTLTriangleFillMode)
@@ -29,10 +31,33 @@ internal protocol SatinRenderCommandEncoder {
         indexBufferOffset: Int,
         instanceCount: Int
     )
+    func setTessellationFactorBuffer(_ buffer: MTLBuffer, offset: Int, instanceStride: Int)
+    func drawPatches(
+        numberOfPatchControlPoints: Int,
+        patchStart: Int,
+        patchCount: Int,
+        patchIndexBuffer: MTLBuffer?,
+        patchIndexBufferOffset: Int,
+        instanceCount: Int,
+        baseInstance: Int
+    )
+    func drawIndexedPatches(
+        numberOfPatchControlPoints: Int,
+        patchStart: Int,
+        patchCount: Int,
+        patchIndexBuffer: MTLBuffer?,
+        patchIndexBufferOffset: Int,
+        controlPointIndexBuffer: MTLBuffer,
+        controlPointIndexBufferOffset: Int,
+        instanceCount: Int,
+        baseInstance: Int
+    )
 }
 
 internal final class MetalRenderCommandEncoder: SatinRenderCommandEncoder {
     private let renderEncoder: MTLRenderCommandEncoder
+
+    let supportsTessellation = true
 
     init(renderEncoder: MTLRenderCommandEncoder) {
         self.renderEncoder = renderEncoder
@@ -112,12 +137,66 @@ internal final class MetalRenderCommandEncoder: SatinRenderCommandEncoder {
             instanceCount: instanceCount
         )
     }
+
+    func setTessellationFactorBuffer(_ buffer: MTLBuffer, offset: Int, instanceStride: Int) {
+        renderEncoder.setTessellationFactorBuffer(
+            buffer,
+            offset: offset,
+            instanceStride: instanceStride
+        )
+    }
+
+    func drawPatches(
+        numberOfPatchControlPoints: Int,
+        patchStart: Int,
+        patchCount: Int,
+        patchIndexBuffer: MTLBuffer?,
+        patchIndexBufferOffset: Int,
+        instanceCount: Int,
+        baseInstance: Int
+    ) {
+        renderEncoder.drawPatches(
+            numberOfPatchControlPoints: numberOfPatchControlPoints,
+            patchStart: patchStart,
+            patchCount: patchCount,
+            patchIndexBuffer: patchIndexBuffer,
+            patchIndexBufferOffset: patchIndexBufferOffset,
+            instanceCount: instanceCount,
+            baseInstance: baseInstance
+        )
+    }
+
+    func drawIndexedPatches(
+        numberOfPatchControlPoints: Int,
+        patchStart: Int,
+        patchCount: Int,
+        patchIndexBuffer: MTLBuffer?,
+        patchIndexBufferOffset: Int,
+        controlPointIndexBuffer: MTLBuffer,
+        controlPointIndexBufferOffset: Int,
+        instanceCount: Int,
+        baseInstance: Int
+    ) {
+        renderEncoder.drawIndexedPatches(
+            numberOfPatchControlPoints: numberOfPatchControlPoints,
+            patchStart: patchStart,
+            patchCount: patchCount,
+            patchIndexBuffer: patchIndexBuffer,
+            patchIndexBufferOffset: patchIndexBufferOffset,
+            controlPointIndexBuffer: controlPointIndexBuffer,
+            controlPointIndexBufferOffset: controlPointIndexBufferOffset,
+            instanceCount: instanceCount,
+            baseInstance: baseInstance
+        )
+    }
 }
 
 @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
 internal final class Metal4RenderCommandEncoder: SatinRenderCommandEncoder {
     private let renderEncoder: any MTL4RenderCommandEncoder
     private let argumentTables: Metal4ArgumentTables
+
+    let supportsTessellation = false
 
     init(renderEncoder: any MTL4RenderCommandEncoder, argumentTables: Metal4ArgumentTables) {
         self.renderEncoder = renderEncoder
@@ -208,4 +287,28 @@ internal final class Metal4RenderCommandEncoder: SatinRenderCommandEncoder {
     static func indexBufferLength(indexBuffer: MTLBuffer, offset: Int) -> Int {
         max(0, indexBuffer.length - offset)
     }
+
+    func setTessellationFactorBuffer(_ buffer: MTLBuffer, offset: Int, instanceStride: Int) {}
+
+    func drawPatches(
+        numberOfPatchControlPoints: Int,
+        patchStart: Int,
+        patchCount: Int,
+        patchIndexBuffer: MTLBuffer?,
+        patchIndexBufferOffset: Int,
+        instanceCount: Int,
+        baseInstance: Int
+    ) {}
+
+    func drawIndexedPatches(
+        numberOfPatchControlPoints: Int,
+        patchStart: Int,
+        patchCount: Int,
+        patchIndexBuffer: MTLBuffer?,
+        patchIndexBufferOffset: Int,
+        controlPointIndexBuffer: MTLBuffer,
+        controlPointIndexBufferOffset: Int,
+        instanceCount: Int,
+        baseInstance: Int
+    ) {}
 }

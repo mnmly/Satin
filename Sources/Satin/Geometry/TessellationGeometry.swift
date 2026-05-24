@@ -82,10 +82,8 @@ public final class TessellationGeometry: Geometry {
     }
 
     override public func draw(renderEncoderState: RenderEncoderState, instanceCount: Int, indexBufferOffset: Int = 0, vertexStart: Int = 0) {
-        // Tessellation remains on the raw Metal encoder; Metal 4 needs a mesh-shader replacement path.
-        let renderEncoder = renderEncoderState.renderEncoder
         if let indexBuffer {
-            renderEncoder.drawIndexedPatches(
+            _ = renderEncoderState.drawIndexedPatches(
                 numberOfPatchControlPoints: controlPointsPerPatch,
                 patchStart: 0,
                 patchCount: patchCount,
@@ -97,7 +95,7 @@ public final class TessellationGeometry: Geometry {
                 baseInstance: 0
             )
         } else {
-            renderEncoder.drawPatches(
+            _ = renderEncoderState.drawPatches(
                 numberOfPatchControlPoints: controlPointsPerPatch,
                 patchStart: 0,
                 patchCount: patchCount,

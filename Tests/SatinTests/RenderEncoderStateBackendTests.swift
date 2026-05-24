@@ -13,11 +13,15 @@ final class RenderEncoderStateBackendTests: XCTestCase {
         let state = RenderEncoderState(renderEncoder: renderEncoder)
 
         XCTAssertTrue(state.supportsClassicRenderEncoder)
+        XCTAssertTrue(state.supportsTessellation)
         XCTAssertTrue(state.renderEncoder === renderEncoder)
 
         let samplerDescriptor = MTLSamplerDescriptor()
         let samplerState = try XCTUnwrap(device.makeSamplerState(descriptor: samplerDescriptor))
         state.setFragmentSamplerState(samplerState, index: .Custom0)
+
+        let tessellationFactorBuffer = try XCTUnwrap(device.makeBuffer(length: 256))
+        XCTAssertTrue(state.setTessellationFactorBuffer(tessellationFactorBuffer, offset: 0, instanceStride: 0))
 
         renderEncoder.endEncoding()
         commandBuffer.commit()
@@ -42,6 +46,10 @@ final class RenderEncoderStateBackendTests: XCTestCase {
         )
 
         XCTAssertFalse(state.supportsClassicRenderEncoder)
+        XCTAssertFalse(state.supportsTessellation)
+
+        let tessellationFactorBuffer = try XCTUnwrap(device.makeBuffer(length: 256))
+        XCTAssertFalse(state.setTessellationFactorBuffer(tessellationFactorBuffer, offset: 0, instanceStride: 0))
 
         renderCommand.renderEncoder.endEncoding()
         frameCommand.end()

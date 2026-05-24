@@ -64,14 +64,14 @@ open class TessellationMesh: Mesh {
             shadow: shadow
         )
 
-        let renderEncoder = renderEncoderState.renderEncoder
+        guard let factorsBuffer = tessellator.factorsBuffer else { return }
 
-        // Tessellation factor binding is not part of Metal 4 render encoders.
-        renderEncoder.setTessellationFactorBuffer(
-            tessellator.factorsBuffer,
+        let didBindTessellationFactors = renderEncoderState.setTessellationFactorBuffer(
+            factorsBuffer,
             offset: 0,
             instanceStride: 0
         )
+        guard didBindTessellationFactors else { return }
 
         geometry.draw(renderEncoderState: renderEncoderState, instanceCount: instanceCount)
     }

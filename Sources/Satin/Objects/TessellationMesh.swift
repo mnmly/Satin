@@ -66,6 +66,7 @@ open class TessellationMesh: Mesh {
 
         let renderEncoder = renderEncoderState.renderEncoder
 
+        // Tessellation factor binding is not part of Metal 4 render encoders.
         renderEncoder.setTessellationFactorBuffer(
             tessellator.factorsBuffer,
             offset: 0,

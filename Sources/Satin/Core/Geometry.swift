@@ -136,10 +136,9 @@ open class Geometry: BufferAttributeDelegate, InterleavedBufferDelegate, Element
     // MARK: - Draw
 
     open func draw(renderEncoderState: RenderEncoderState, instanceCount: Int, indexBufferOffset: Int = 0, vertexStart: Int = 0) {
-        let renderEncoder = renderEncoderState.renderEncoder
         if let indexBuffer = indexBuffer, let indexType = indexType {
             if indexCount > 0 {
-                renderEncoder.drawIndexedPrimitives(
+                renderEncoderState.drawIndexedPrimitives(
                     type: primitiveType,
                     indexCount: indexCount,
                     indexType: indexType,
@@ -151,7 +150,7 @@ open class Geometry: BufferAttributeDelegate, InterleavedBufferDelegate, Element
         }
         else {
             if vertexCount > 0 {
-                renderEncoder.drawPrimitives(
+                renderEncoderState.drawPrimitives(
                     type: primitiveType,
                     vertexStart: vertexStart,
                     vertexCount: vertexCount,

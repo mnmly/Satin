@@ -19,6 +19,15 @@ internal protocol SatinRenderCommandEncoder {
     func setFragmentBuffer(_ buffer: MTLBuffer, offset: Int, index: Int)
     func setVertexTexture(_ texture: MTLTexture?, index: Int)
     func setFragmentTexture(_ texture: MTLTexture?, index: Int)
+    func drawPrimitives(type: MTLPrimitiveType, vertexStart: Int, vertexCount: Int, instanceCount: Int)
+    func drawIndexedPrimitives(
+        type: MTLPrimitiveType,
+        indexCount: Int,
+        indexType: MTLIndexType,
+        indexBuffer: MTLBuffer,
+        indexBufferOffset: Int,
+        instanceCount: Int
+    )
 }
 
 internal final class MetalRenderCommandEncoder: SatinRenderCommandEncoder {
@@ -70,5 +79,32 @@ internal final class MetalRenderCommandEncoder: SatinRenderCommandEncoder {
 
     func setFragmentTexture(_ texture: MTLTexture?, index: Int) {
         renderEncoder.setFragmentTexture(texture, index: index)
+    }
+
+    func drawPrimitives(type: MTLPrimitiveType, vertexStart: Int, vertexCount: Int, instanceCount: Int) {
+        renderEncoder.drawPrimitives(
+            type: type,
+            vertexStart: vertexStart,
+            vertexCount: vertexCount,
+            instanceCount: instanceCount
+        )
+    }
+
+    func drawIndexedPrimitives(
+        type: MTLPrimitiveType,
+        indexCount: Int,
+        indexType: MTLIndexType,
+        indexBuffer: MTLBuffer,
+        indexBufferOffset: Int,
+        instanceCount: Int
+    ) {
+        renderEncoder.drawIndexedPrimitives(
+            type: type,
+            indexCount: indexCount,
+            indexType: indexType,
+            indexBuffer: indexBuffer,
+            indexBufferOffset: indexBufferOffset,
+            instanceCount: instanceCount
+        )
     }
 }

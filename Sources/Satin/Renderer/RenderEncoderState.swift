@@ -192,6 +192,33 @@ public final class RenderEncoderState {
         }
     }
 
+    public func drawPrimitives(type: MTLPrimitiveType, vertexStart: Int, vertexCount: Int, instanceCount: Int) {
+        commands.drawPrimitives(
+            type: type,
+            vertexStart: vertexStart,
+            vertexCount: vertexCount,
+            instanceCount: instanceCount
+        )
+    }
+
+    public func drawIndexedPrimitives(
+        type: MTLPrimitiveType,
+        indexCount: Int,
+        indexType: MTLIndexType,
+        indexBuffer: MTLBuffer,
+        indexBufferOffset: Int,
+        instanceCount: Int
+    ) {
+        commands.drawIndexedPrimitives(
+            type: type,
+            indexCount: indexCount,
+            indexType: indexType,
+            indexBuffer: indexBuffer,
+            indexBufferOffset: indexBufferOffset,
+            instanceCount: instanceCount
+        )
+    }
+
     init(renderEncoder: MTLRenderCommandEncoder) {
         self.renderEncoder = renderEncoder
         self.commands = MetalRenderCommandEncoder(renderEncoder: renderEncoder)

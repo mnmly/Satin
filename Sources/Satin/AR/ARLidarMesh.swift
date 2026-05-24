@@ -124,10 +124,8 @@ public class ARLidarMesh: Renderable {
             shadow: shadow
         )
 
-        let renderEncoder = renderEncoderState.renderEncoder
-
         if let indexBuffer = indexBuffer {
-            renderEncoder.drawIndexedPrimitives(
+            renderEncoderState.drawIndexedPrimitives(
                 type: .triangle,
                 indexCount: indexCount,
                 indexType: .uint32,
@@ -136,7 +134,7 @@ public class ARLidarMesh: Renderable {
                 instanceCount: 1
             )
         } else {
-            renderEncoder.drawPrimitives(
+            renderEncoderState.drawPrimitives(
                 type: .triangle,
                 vertexStart: 0,
                 vertexCount: vertexCount,

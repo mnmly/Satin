@@ -19,6 +19,7 @@ internal protocol SatinRenderCommandEncoder {
     func setFragmentBuffer(_ buffer: MTLBuffer, offset: Int, index: Int)
     func setVertexTexture(_ texture: MTLTexture?, index: Int)
     func setFragmentTexture(_ texture: MTLTexture?, index: Int)
+    func setFragmentSamplerState(_ samplerState: MTLSamplerState?, index: Int)
     func drawPrimitives(type: MTLPrimitiveType, vertexStart: Int, vertexCount: Int, instanceCount: Int)
     func drawIndexedPrimitives(
         type: MTLPrimitiveType,
@@ -79,6 +80,10 @@ internal final class MetalRenderCommandEncoder: SatinRenderCommandEncoder {
 
     func setFragmentTexture(_ texture: MTLTexture?, index: Int) {
         renderEncoder.setFragmentTexture(texture, index: index)
+    }
+
+    func setFragmentSamplerState(_ samplerState: MTLSamplerState?, index: Int) {
+        renderEncoder.setFragmentSamplerState(samplerState, index: index)
     }
 
     func drawPrimitives(type: MTLPrimitiveType, vertexStart: Int, vertexCount: Int, instanceCount: Int) {
@@ -166,6 +171,11 @@ internal final class Metal4RenderCommandEncoder: SatinRenderCommandEncoder {
     func setFragmentTexture(_ texture: MTLTexture?, index: Int) {
         guard let fragmentTextureIndex = FragmentTextureIndex(rawValue: index) else { return }
         argumentTables.setFragmentTexture(texture, index: fragmentTextureIndex)
+    }
+
+    func setFragmentSamplerState(_ samplerState: MTLSamplerState?, index: Int) {
+        guard let fragmentSamplerIndex = FragmentSamplerIndex(rawValue: index) else { return }
+        argumentTables.setFragmentSamplerState(samplerState, index: fragmentSamplerIndex)
     }
 
     func drawPrimitives(type: MTLPrimitiveType, vertexStart: Int, vertexCount: Int, instanceCount: Int) {

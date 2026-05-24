@@ -93,9 +93,12 @@ open class BasicTextureMaterial: BasicColorMaterial {
     }
 
     override public func bind(renderContext: Context, renderEncoderState: RenderEncoderState, shadow: Bool) {
-        let renderEncoder = renderEncoderState.renderEncoder
-        bindTexture(renderEncoder)
-        bindSampler(renderEncoder)
+        if let texture {
+            renderEncoderState.setFragmentTexture(texture, index: .Custom0)
+        }
+        if let sampler {
+            renderEncoderState.setFragmentSamplerState(sampler, index: .Custom0)
+        }
         super.bind(
             renderContext: renderContext,
             renderEncoderState: renderEncoderState,

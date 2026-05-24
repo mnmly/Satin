@@ -15,6 +15,10 @@ final class RenderEncoderStateBackendTests: XCTestCase {
         XCTAssertTrue(state.supportsClassicRenderEncoder)
         XCTAssertTrue(state.renderEncoder === renderEncoder)
 
+        let samplerDescriptor = MTLSamplerDescriptor()
+        let samplerState = try XCTUnwrap(device.makeSamplerState(descriptor: samplerDescriptor))
+        state.setFragmentSamplerState(samplerState, index: .Custom0)
+
         renderEncoder.endEncoding()
         commandBuffer.commit()
         commandBuffer.waitUntilCompleted()

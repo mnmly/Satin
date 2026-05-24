@@ -3,6 +3,17 @@ import Satin
 import XCTest
 
 final class MaterialCoverageTests: XCTestCase {
+    func testMaterialCloneCopiesBindStateHook() throws {
+        let device = try XCTUnwrap(MTLCreateSystemDefaultDevice())
+        let context = Context(device: device, sampleCount: 1, colorPixelFormat: .bgra8Unorm)
+        let material = BasicColorMaterial(context: context)
+        material.onBindState = { _ in }
+
+        let clone = material.clone(context: context)
+
+        XCTAssertNotNil(clone.onBindState)
+    }
+
     func testARCompositorMaterial() throws {
         let image = try renderMaterial(size: [176, 176]) { context, device, camera in
             camera.position = [0.0, 0.0, 3.0]

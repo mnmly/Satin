@@ -211,6 +211,7 @@ open class Material: Codable {
 
     public var depthBias: DepthBias?
     public var onBind: ((_ renderEncoder: MTLRenderCommandEncoder) -> Void)?
+    public var onBindState: ((_ renderEncoderState: RenderEncoderState) -> Void)?
     public var onUpdate: (() -> Void)?
 
     // MARK: - Rendering Path
@@ -595,7 +596,10 @@ open class Material: Codable {
             renderEncoderState: renderEncoderState,
             shadow: shadow
         )
-        onBind?(renderEncoderState.renderEncoder)
+        onBindState?(renderEncoderState)
+        if renderEncoderState.supportsClassicRenderEncoder {
+            onBind?(renderEncoderState.renderEncoder)
+        }
     }
 
     public func getPipeline(renderContext: Context, shadow: Bool) -> MTLRenderPipelineState? {
@@ -840,6 +844,7 @@ open class Material: Codable {
 
         clone.onUpdate = onUpdate
         clone.onBind = onBind
+        clone.onBindState = onBindState
 
         clone.renderingConfiguration = renderingConfiguration
 

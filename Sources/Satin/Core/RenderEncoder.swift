@@ -1487,10 +1487,6 @@ open class RenderEncoder {
             return failFrameCommandDraw("Metal 4 frame-command rendering currently supports forward rendering mode only.")
         }
 
-        guard context.sampleCount == 1 else {
-            return failFrameCommandDraw("Metal 4 frame-command rendering currently does not support multisample render targets.")
-        }
-
         guard context.vertexAmplificationCount == 1, viewMappings.isEmpty else {
             return failFrameCommandDraw("Metal 4 frame-command rendering currently does not support vertex amplification.")
         }
@@ -1532,6 +1528,7 @@ open class RenderEncoder {
         renderPassDescriptor.colorAttachments[0].clearColor = clearColor
         renderPassDescriptor.depthAttachment.clearDepth = clearDepth
         renderPassDescriptor.stencilAttachment.clearStencil = clearStencil
+        configureMainStoreActionsForSampleCount(renderPassDescriptor: renderPassDescriptor)
 
         let hasClassicTransparentRenderables = !routePassEntries(route: .classicTransparent).isEmpty
         let opaqueEncoded = encodeMetal4Route(
@@ -1568,6 +1565,34 @@ open class RenderEncoder {
         }
 
         return didEncode
+    }
+
+    private func configureMainStoreActionsForSampleCount(renderPassDescriptor: MTLRenderPassDescriptor) {
+        guard context.sampleCount > 1 else { return }
+
+        if renderPassDescriptor.colorAttachments[0].resolveTexture != nil {
+            if colorStoreAction == .store || colorStoreAction == .storeAndMultisampleResolve {
+                renderPassDescriptor.colorAttachments[0].storeAction = .storeAndMultisampleResolve
+            } else {
+                renderPassDescriptor.colorAttachments[0].storeAction = .multisampleResolve
+            }
+        }
+
+        if renderPassDescriptor.depthAttachment.resolveTexture != nil {
+            if depthStoreAction == .store || depthStoreAction == .storeAndMultisampleResolve {
+                renderPassDescriptor.depthAttachment.storeAction = .storeAndMultisampleResolve
+            } else {
+                renderPassDescriptor.depthAttachment.storeAction = .multisampleResolve
+            }
+        }
+
+        if renderPassDescriptor.stencilAttachment.resolveTexture != nil {
+            if stencilStoreAction == .store || stencilStoreAction == .storeAndMultisampleResolve {
+                renderPassDescriptor.stencilAttachment.storeAction = .storeAndMultisampleResolve
+            } else {
+                renderPassDescriptor.stencilAttachment.storeAction = .multisampleResolve
+            }
+        }
     }
 
     @discardableResult

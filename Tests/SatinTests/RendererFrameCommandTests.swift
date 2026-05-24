@@ -90,7 +90,7 @@ final class RendererFrameCommandTests: XCTestCase {
         XCTAssertEqual(frameCommand.commandBuffer.status, .completed)
     }
 
-    func testMetal4FrameCommandDrawReportsUnsupportedMultisample() throws {
+    func testMetal4FrameCommandDrawSupportsMultisample() throws {
         guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) else {
             throw XCTSkip("Metal 4 requires OS 26 or newer.")
         }
@@ -106,22 +106,18 @@ final class RendererFrameCommandTests: XCTestCase {
         let renderEncoder = RenderEncoder(context: context)
         let scene = Object(context: context)
         let camera = PerspectiveCamera(context: context, position: [0.0, 0.0, 4.0], near: 0.1, far: 100.0, fov: 30.0)
-        let renderPassDescriptor = MTLRenderPassDescriptor()
-        renderPassDescriptor.colorAttachments[0].texture = try XCTUnwrap(makeTexture(device: device))
-        renderPassDescriptor.colorAttachments[0].loadAction = .clear
-        renderPassDescriptor.colorAttachments[0].storeAction = .store
+        let renderPassDescriptor = renderer.makeRenderPassDescriptor(texture: try XCTUnwrap(makeTexture(device: device)))
 
-        XCTAssertFalse(renderEncoder.draw(
+        XCTAssertTrue(renderEncoder.draw(
             renderPassDescriptor: renderPassDescriptor,
             frameCommand: frameCommand,
             scene: scene,
             camera: camera,
             viewport: MTLViewport(originX: 0, originY: 0, width: 4, height: 4, znear: 0, zfar: 1)
         ))
-        XCTAssertEqual(
-            renderEncoder.lastFrameCommandDrawFailure,
-            "Metal 4 frame-command rendering currently does not support multisample render targets."
-        )
+        XCTAssertNil(renderEncoder.lastFrameCommandDrawFailure)
+        XCTAssertEqual(renderPassDescriptor.colorAttachments[0].storeAction, .storeAndMultisampleResolve)
+        XCTAssertNotNil(renderPassDescriptor.colorAttachments[0].resolveTexture)
 
         renderer.commitFrameCommand(frameCommand)
     }

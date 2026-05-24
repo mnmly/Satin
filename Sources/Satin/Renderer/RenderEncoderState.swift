@@ -10,11 +10,12 @@ import Metal
 
 public final class RenderEncoderState {
     public let renderEncoder: MTLRenderCommandEncoder
+    private let commands: SatinRenderCommandEncoder
 
     public var cullMode: MTLCullMode? {
         didSet {
             if oldValue != cullMode, let cullMode {
-                renderEncoder.setCullMode(cullMode)
+                commands.setCullMode(cullMode)
             }
         }
     }
@@ -22,7 +23,7 @@ public final class RenderEncoderState {
     public var windingOrder: MTLWinding? {
         didSet {
             if oldValue != windingOrder, let windingOrder {
-                renderEncoder.setFrontFacing(windingOrder)
+                commands.setFrontFacing(windingOrder)
             }
         }
     }
@@ -30,7 +31,7 @@ public final class RenderEncoderState {
     public var triangleFillMode: MTLTriangleFillMode? {
         didSet {
             if oldValue != triangleFillMode, let triangleFillMode {
-                renderEncoder.setTriangleFillMode(triangleFillMode)
+                commands.setTriangleFillMode(triangleFillMode)
             }
         }
     }
@@ -38,7 +39,7 @@ public final class RenderEncoderState {
     public var pipeline: MTLRenderPipelineState? {
         didSet {
             if oldValue !== pipeline, let pipeline {
-                renderEncoder.setRenderPipelineState(pipeline)
+                commands.setRenderPipelineState(pipeline)
             }
         }
     }
@@ -46,7 +47,7 @@ public final class RenderEncoderState {
     public var depthStencilState: MTLDepthStencilState? {
         didSet {
             if oldValue !== depthStencilState {
-                renderEncoder.setDepthStencilState(depthStencilState)
+                commands.setDepthStencilState(depthStencilState)
             }
         }
     }
@@ -55,7 +56,7 @@ public final class RenderEncoderState {
         didSet {
             if oldValue != depthClipMode, let depthClipMode {
                 #if !targetEnvironment(simulator)
-                renderEncoder.setDepthClipMode(depthClipMode)
+                commands.setDepthClipMode(depthClipMode)
                 #endif
             }
         }
@@ -65,10 +66,10 @@ public final class RenderEncoderState {
         didSet {
             if oldValue != depthBias {
                 if let depthBias = depthBias {
-                    renderEncoder.setDepthBias(depthBias.bias, slopeScale: depthBias.slope, clamp: depthBias.clamp)
+                    commands.setDepthBias(depthBias.bias, slopeScale: depthBias.slope, clamp: depthBias.clamp)
                 }
                 else {
-                    renderEncoder.setDepthBias(0.0, slopeScale: 0.0, clamp: 0.0)
+                    commands.setDepthBias(0.0, slopeScale: 0.0, clamp: 0.0)
                 }
             }
         }
@@ -77,7 +78,7 @@ public final class RenderEncoderState {
     public var vertexVertexUniforms: VertexUniformBuffer? {
         didSet {
             if oldValue !== vertexVertexUniforms, let vertexVertexUniforms {
-                renderEncoder.setVertexBuffer(
+                commands.setVertexBuffer(
                     vertexVertexUniforms.buffer,
                     offset: vertexVertexUniforms.offset,
                     index: VertexBufferIndex.VertexUniforms.rawValue
@@ -89,7 +90,7 @@ public final class RenderEncoderState {
     public var fragmentVertexUniforms: VertexUniformBuffer? {
         didSet {
             if oldValue !== fragmentVertexUniforms, let fragmentVertexUniforms {
-                renderEncoder.setFragmentBuffer(
+                commands.setFragmentBuffer(
                     fragmentVertexUniforms.buffer,
                     offset: fragmentVertexUniforms.offset,
                     index: FragmentBufferIndex.VertexUniforms.rawValue
@@ -101,7 +102,7 @@ public final class RenderEncoderState {
     public var vertexMaterialUniforms: UniformBuffer? {
         didSet {
             if oldValue !== vertexMaterialUniforms, let vertexMaterialUniforms {
-                renderEncoder.setVertexBuffer(
+                commands.setVertexBuffer(
                     vertexMaterialUniforms.buffer,
                     offset: vertexMaterialUniforms.offset,
                     index: VertexBufferIndex.MaterialUniforms.rawValue
@@ -113,7 +114,7 @@ public final class RenderEncoderState {
     public var vertexInstanceUniforms: InstanceMatrixUniformBuffer? {
         didSet {
             if oldValue !== vertexInstanceUniforms, let vertexInstanceUniforms {
-                renderEncoder.setVertexBuffer(
+                commands.setVertexBuffer(
                     vertexInstanceUniforms.buffer,
                     offset: vertexInstanceUniforms.offset,
                     index: VertexBufferIndex.InstanceMatrixUniforms.rawValue
@@ -125,7 +126,7 @@ public final class RenderEncoderState {
     public var fragmentMaterialUniforms: UniformBuffer? {
         didSet {
             if oldValue !== fragmentMaterialUniforms, let fragmentMaterialUniforms {
-                renderEncoder.setFragmentBuffer(
+                commands.setFragmentBuffer(
                     fragmentMaterialUniforms.buffer,
                     offset: fragmentMaterialUniforms.offset,
                     index: FragmentBufferIndex.MaterialUniforms.rawValue
@@ -146,7 +147,7 @@ public final class RenderEncoderState {
             return
         }
         else {
-            renderEncoder.setVertexBuffer(buffer, offset: offset, index: index.rawValue)
+            commands.setVertexBuffer(buffer, offset: offset, index: index.rawValue)
             vertexBuffers[index] = buffer
         }
     }
@@ -156,7 +157,7 @@ public final class RenderEncoderState {
             return
         }
         else {
-            renderEncoder.setFragmentBuffer(buffer, offset: offset, index: index.rawValue)
+            commands.setFragmentBuffer(buffer, offset: offset, index: index.rawValue)
             fragmentBuffers[index] = buffer
         }
     }
@@ -166,7 +167,7 @@ public final class RenderEncoderState {
             return
         }
         else {
-            renderEncoder.setFragmentTexture(texture, index: type.index)
+            commands.setFragmentTexture(texture, index: type.index)
             fragmentPBRTextures[type] = texture
         }
     }
@@ -176,7 +177,7 @@ public final class RenderEncoderState {
             return
         }
         else {
-            renderEncoder.setVertexTexture(texture, index: index.rawValue)
+            commands.setVertexTexture(texture, index: index.rawValue)
             vertexTextures[index] = texture
         }
     }
@@ -186,12 +187,13 @@ public final class RenderEncoderState {
             return
         }
         else {
-            renderEncoder.setFragmentTexture(texture, index: index.rawValue)
+            commands.setFragmentTexture(texture, index: index.rawValue)
             fragmentTextures[index] = texture
         }
     }
 
     init(renderEncoder: MTLRenderCommandEncoder) {
         self.renderEncoder = renderEncoder
+        self.commands = MetalRenderCommandEncoder(renderEncoder: renderEncoder)
     }
 }

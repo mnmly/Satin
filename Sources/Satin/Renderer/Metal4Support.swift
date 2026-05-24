@@ -32,4 +32,17 @@ internal final class Metal4Support {
         self.commandBuffer = commandBuffer
         self.commandAllocators = commandAllocators
     }
+
+    func makeFrameCommand(frameIndex: Int) -> Metal4FrameCommand? {
+        guard !commandAllocators.isEmpty else { return nil }
+        let frameSlot = frameIndex % commandAllocators.count
+        let frameCommand = Metal4FrameCommand(
+            frameIndex: frameIndex,
+            commandQueue: commandQueue,
+            commandBuffer: commandBuffer,
+            commandAllocator: commandAllocators[frameSlot]
+        )
+        frameCommand.begin()
+        return frameCommand
+    }
 }

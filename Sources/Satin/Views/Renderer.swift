@@ -95,16 +95,20 @@ open class Renderer {
         }
     }
 
-    open func preDraw() -> MTLCommandBuffer? {
+    internal func makeMetalFrameCommand() -> MetalFrameCommand? {
         waitForAvailableFrameSlot()
         frameIndex += 1
 
         if let commandBuffer = commandQueue.makeCommandBuffer() {
             registerInFlight(commandBuffer)
-            return commandBuffer
+            return MetalFrameCommand(frameIndex: frameIndex, commandBuffer: commandBuffer)
         }
 
         return nil
+    }
+
+    open func preDraw() -> MTLCommandBuffer? {
+        makeMetalFrameCommand()?.commandBuffer
     }
 
     open func draw(texture: MTLTexture, commandBuffer: MTLCommandBuffer) {
@@ -136,7 +140,7 @@ open class Renderer {
     open func draw(renderPassDescriptor: MTLRenderPassDescriptor, commandBuffer: MTLCommandBuffer) {}
 
     open func postDraw(commandBuffer: MTLCommandBuffer) {
-        commandBuffer.commit()
+        MetalFrameCommand(frameIndex: frameIndex, commandBuffer: commandBuffer).commit()
     }
 
     open func setup() {}

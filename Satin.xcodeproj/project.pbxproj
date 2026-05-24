@@ -30,6 +30,7 @@
 		99D845022FC31B17002590CB /* Metal4RenderPassBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99D844FC2FC31B17002590CB /* Metal4RenderPassBridge.swift */; };
 		99D845032FC31B17002590CB /* RenderCommandEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99D844FE2FC31B17002590CB /* RenderCommandEncoder.swift */; };
 		99D845042FC31B17002590CB /* FrameCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99D844F92FC31B17002590CB /* FrameCommand.swift */; };
+		99D845052FC31B17002590CB /* Metal4ComputeArgumentTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99D844F82FC31B17002590CB /* Metal4ComputeArgumentTable.swift */; };
 		AA000001AA000001AA000001 /* VelocityMaterial.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002AA000002AA000002 /* VelocityMaterial.swift */; };
 		AA000003AA000003AA000003 /* SsaoMaterial.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000004AA000004AA000004 /* SsaoMaterial.swift */; };
 		AA000005AA000005AA000005 /* MotionBlurMaterial.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000006AA000006AA000006 /* MotionBlurMaterial.swift */; };
@@ -543,6 +544,7 @@
 		66D7DEF62C06A24B00B5A6C8 /* Triangulator.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = Triangulator.mm; sourceTree = "<group>"; };
 		66D7DEF72C06A24B00B5A6C8 /* Types.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = Types.mm; sourceTree = "<group>"; };
 		99D844F92FC31B17002590CB /* FrameCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameCommand.swift; sourceTree = "<group>"; };
+		99D844F82FC31B17002590CB /* Metal4ComputeArgumentTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metal4ComputeArgumentTable.swift; sourceTree = "<group>"; };
 		99D844FA2FC31B17002590CB /* Metal4ArgumentBindingLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metal4ArgumentBindingLayout.swift; sourceTree = "<group>"; };
 		99D844FB2FC31B17002590CB /* Metal4ArgumentTables.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metal4ArgumentTables.swift; sourceTree = "<group>"; };
 		99D844FC2FC31B17002590CB /* Metal4RenderPassBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metal4RenderPassBridge.swift; sourceTree = "<group>"; };
@@ -979,6 +981,7 @@
 				99D844F92FC31B17002590CB /* FrameCommand.swift */,
 				99D844FA2FC31B17002590CB /* Metal4ArgumentBindingLayout.swift */,
 				99D844FB2FC31B17002590CB /* Metal4ArgumentTables.swift */,
+				99D844F82FC31B17002590CB /* Metal4ComputeArgumentTable.swift */,
 				99D844FC2FC31B17002590CB /* Metal4RenderPassBridge.swift */,
 				99D844FD2FC31B17002590CB /* Metal4Support.swift */,
 				99D844FE2FC31B17002590CB /* RenderCommandEncoder.swift */,
@@ -1367,6 +1370,7 @@
 				E101A9342C070EA00055FABA /* RenderingConfiguration.swift in Sources */,
 				99D844FF2FC31B17002590CB /* Metal4ArgumentBindingLayout.swift in Sources */,
 				99D845002FC31B17002590CB /* Metal4ArgumentTables.swift in Sources */,
+				99D845052FC31B17002590CB /* Metal4ComputeArgumentTable.swift in Sources */,
 				99D845012FC31B17002590CB /* Metal4Support.swift in Sources */,
 				99D845022FC31B17002590CB /* Metal4RenderPassBridge.swift in Sources */,
 				99D845032FC31B17002590CB /* RenderCommandEncoder.swift in Sources */,

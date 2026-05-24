@@ -66,4 +66,13 @@ public final class RandomNoiseGenerator {
         texture?.label = "Random Noise"
         return texture
     }
+
+    public func encode(frameCommand: any SatinFrameCommand) -> MTLTexture? {
+        compute.set("Range", [range.lowerBound, range.upperBound])
+        compute.set("Seed", seed)
+        guard compute.update(frameCommand) else { return nil }
+        let texture = compute.dstTexture
+        texture?.label = "Random Noise"
+        return texture
+    }
 }

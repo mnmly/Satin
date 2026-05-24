@@ -39,6 +39,11 @@ public final class BrdfGenerator {
         return compute.computeTextures[.Custom0]
     }
 
+    public func encode(frameCommand: any SatinFrameCommand) -> MTLTexture? {
+        guard compute.update(frameCommand) else { return nil }
+        return compute.computeTextures[.Custom0]
+    }
+
     public func encode(computeEncoder: MTLComputeCommandEncoder) -> MTLTexture? {
         compute.update(computeEncoder)
         return compute.computeTextures[.Custom0]

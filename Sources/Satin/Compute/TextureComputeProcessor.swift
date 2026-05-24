@@ -68,6 +68,31 @@ open class TextureComputeProcessor: ComputeProcessor {
         }
     }
 
+    @discardableResult
+    override open func update(_ frameCommand: any SatinFrameCommand, iterations: Int = 1) -> Bool {
+        if let frameCommand = frameCommand as? MetalFrameCommand {
+            update(frameCommand.commandBuffer, iterations: iterations)
+            return true
+        }
+
+        guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
+              let frameCommand = frameCommand as? Metal4FrameCommand
+        else { return false }
+
+        super.update()
+        guard (_reset && resetPipeline != nil) || updatePipeline != nil else { return true }
+        guard computeTextures.count > 0,
+              let computeEncoder = frameCommand.commandBuffer.makeComputeCommandEncoder(),
+              let argumentTable = Metal4ComputeArgumentTable(device: device)
+        else { return false }
+
+        computeEncoder.label = label
+        argumentTable.bind(to: computeEncoder)
+        encode(computeEncoder, argumentTable: argumentTable, iterations: iterations)
+        computeEncoder.endEncoding()
+        return true
+    }
+
     private func encode(_ computeEncoder: MTLComputeCommandEncoder, iterations: Int = 1) {
         bindUniforms(computeEncoder)
         bindBuffers(computeEncoder)
@@ -90,6 +115,34 @@ open class TextureComputeProcessor: ComputeProcessor {
                 preCompute?(computeEncoder, iteration)
                 dispatch(
                     computeEncoder: computeEncoder,
+                    pipeline: pipeline,
+                    iteration: iteration
+                )
+            }
+        }
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    private func encode(_ computeEncoder: any MTL4ComputeCommandEncoder, argumentTable: Metal4ComputeArgumentTable, iterations: Int = 1) {
+        bindUniforms(argumentTable)
+        bindBuffers(argumentTable)
+        bindTextures(argumentTable)
+
+        if _reset, let pipeline = resetPipeline {
+            computeEncoder.setComputePipelineState(pipeline)
+            dispatch(
+                metal4ComputeEncoder: computeEncoder,
+                pipeline: pipeline,
+                iteration: 0
+            )
+            _reset = false
+        }
+
+        if let pipeline = updatePipeline {
+            computeEncoder.setComputePipelineState(pipeline)
+            for iteration in 0 ..< iterations {
+                dispatch(
+                    metal4ComputeEncoder: computeEncoder,
                     pipeline: pipeline,
                     iteration: iteration
                 )
@@ -180,6 +233,16 @@ open class TextureComputeProcessor: ComputeProcessor {
 
             computeEncoder.dispatchThreads(threadPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
         }
+
+        @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+        override open func dispatchThreads(metal4ComputeEncoder: any MTL4ComputeCommandEncoder, pipeline: MTLComputePipelineState, iteration: Int) {
+            guard let texture = computeTextures[.Custom0] else { return }
+
+            let threadPerGrid = threadsPerGrid ?? getThreadsPerGrid(texture: texture, iteration: iteration)
+            let threadsPerThreadgroup = threadsPerThreadgroup ?? getThreadsPerThreadgroup(texture: texture, pipeline: pipeline, iteration: iteration)
+
+            metal4ComputeEncoder.dispatchThreads(threadsPerGrid: threadPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
+        }
     #endif
 
     override open func dispatchThreadgroups(computeEncoder: MTLComputeCommandEncoder, pipeline: MTLComputePipelineState, iteration: Int) {
@@ -189,6 +252,16 @@ open class TextureComputeProcessor: ComputeProcessor {
         let threadsPerThreadGroup = threadsPerThreadgroup ?? getThreadsPerThreadgroup(texture: texture, pipeline: pipeline, iteration: iteration)
 
         computeEncoder.dispatchThreadgroups(threadGroupsPerGrid, threadsPerThreadgroup: threadsPerThreadGroup)
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    override open func dispatchThreadgroups(metal4ComputeEncoder: any MTL4ComputeCommandEncoder, pipeline: MTLComputePipelineState, iteration: Int) {
+        guard let texture = computeTextures[.Custom0] else { return }
+
+        let threadGroupsPerGrid = threadGroupsPerGrid ?? getThreadGroupsPerGrid(texture: texture, pipeline: pipeline, iteration: iteration)
+        let threadsPerThreadGroup = threadsPerThreadgroup ?? getThreadsPerThreadgroup(texture: texture, pipeline: pipeline, iteration: iteration)
+
+        metal4ComputeEncoder.dispatchThreadgroups(threadgroupsPerGrid: threadGroupsPerGrid, threadsPerThreadgroup: threadsPerThreadGroup)
     }
 
     // MARK: - Reset

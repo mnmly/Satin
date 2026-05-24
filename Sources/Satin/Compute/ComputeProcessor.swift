@@ -185,6 +185,15 @@ open class ComputeProcessor: ComputeShaderDelegate {
         update()
     }
 
+    @discardableResult
+    open func update(_ frameCommand: any SatinFrameCommand, iterations: Int = 1) -> Bool {
+        if let frameCommand = frameCommand as? MetalFrameCommand {
+            update(frameCommand.commandBuffer, iterations: iterations)
+            return true
+        }
+        return false
+    }
+
     // MARK: - Reset
 
     open func reset() {
@@ -215,6 +224,25 @@ open class ComputeProcessor: ComputeShaderDelegate {
 #endif
 
     open func dispatchThreadgroups(computeEncoder: MTLComputeCommandEncoder, pipeline: MTLComputePipelineState, iteration: Int) {}
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    func dispatch(metal4ComputeEncoder: any MTL4ComputeCommandEncoder, pipeline: MTLComputePipelineState, iteration: Int) {
+#if os(macOS) || os(iOS) || os(visionOS)
+        if _useDispatchThreads {
+            dispatchThreads(metal4ComputeEncoder: metal4ComputeEncoder, pipeline: pipeline, iteration: iteration)
+        } else {
+            dispatchThreadgroups(metal4ComputeEncoder: metal4ComputeEncoder, pipeline: pipeline, iteration: iteration)
+        }
+#elseif os(tvOS)
+        dispatchThreadgroups(metal4ComputeEncoder: metal4ComputeEncoder, pipeline: pipeline, iteration: iteration)
+#endif
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    open func dispatchThreads(metal4ComputeEncoder: any MTL4ComputeCommandEncoder, pipeline: MTLComputePipelineState, iteration: Int) {}
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    open func dispatchThreadgroups(metal4ComputeEncoder: any MTL4ComputeCommandEncoder, pipeline: MTLComputePipelineState, iteration: Int) {}
 
     // MARK: - Uniforms
 
@@ -270,6 +298,38 @@ open class ComputeProcessor: ComputeShaderDelegate {
         for index in shader.textureBindingIsUsed {
             if let texture = computeTextures[index] {
                 computeEncoder.setTexture(texture, index: index.rawValue)
+            }
+        }
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    func bindUniforms(_ argumentTable: Metal4ComputeArgumentTable) {
+        guard let uniforms, let shader, shader.resetWantsUniforms || shader.updateWantsUniforms else { return }
+        argumentTable.setBuffer(uniforms.buffer, offset: uniforms.offset, index: .Uniforms)
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    func bindBuffers(_ argumentTable: Metal4ComputeArgumentTable) {
+        guard let shader else { return }
+
+        for index in shader.bufferBindingIsUsed {
+            if let uniformBuffer = computeUniformBuffers[index] {
+                argumentTable.setBuffer(uniformBuffer.buffer, offset: uniformBuffer.offset, index: index)
+            } else if let structBuffer = computeStructBuffers[index] {
+                argumentTable.setBuffer(structBuffer.buffer, offset: structBuffer.offset, index: index)
+            } else if let buffer = computeBuffers[index] {
+                argumentTable.setBuffer(buffer, offset: 0, index: index)
+            }
+        }
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    func bindTextures(_ argumentTable: Metal4ComputeArgumentTable) {
+        guard let shader else { return }
+
+        for index in shader.textureBindingIsUsed {
+            if let texture = computeTextures[index] {
+                argumentTable.setTexture(texture, index: index)
             }
         }
     }

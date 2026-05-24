@@ -165,6 +165,31 @@ open class TextureComputeSystem: ComputeSystem {
         }
     }
 
+    @discardableResult
+    override open func update(_ frameCommand: any SatinFrameCommand, iterations: Int = 1) -> Bool {
+        if let frameCommand = frameCommand as? MetalFrameCommand {
+            update(frameCommand.commandBuffer, iterations: iterations)
+            return true
+        }
+
+        guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
+              let frameCommand = frameCommand as? Metal4FrameCommand
+        else { return false }
+
+        super.update()
+        guard (_reset && resetPipeline != nil) || updatePipeline != nil else { return true }
+        guard textures.count > 0,
+              let computeEncoder = frameCommand.commandBuffer.makeComputeCommandEncoder(),
+              let argumentTable = Metal4ComputeArgumentTable(device: device)
+        else { return false }
+
+        computeEncoder.label = label
+        argumentTable.bind(to: computeEncoder)
+        encode(computeEncoder, argumentTable: argumentTable, iterations: iterations)
+        computeEncoder.endEncoding()
+        return true
+    }
+
     // MARK: - Binding & Encoding
 
     open func bind(computeEncoder: MTLComputeCommandEncoder, iteration: Int) -> Int {
@@ -200,6 +225,34 @@ open class TextureComputeSystem: ComputeSystem {
         }
     }
 
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    private func encode(_ computeEncoder: any MTL4ComputeCommandEncoder, argumentTable: Metal4ComputeArgumentTable, iterations: Int = 1) {
+        bindUniforms(argumentTable)
+        bindBuffers(argumentTable)
+        bindTextures(argumentTable)
+
+        if _reset, let pipeline = resetPipeline {
+            computeEncoder.setComputePipelineState(pipeline)
+
+            for _ in 0 ..< feedbackCount {
+                _ = bind(argumentTable, iteration: 0)
+                dispatch(metal4ComputeEncoder: computeEncoder, pipeline: pipeline, iteration: 0)
+                swapSrdDstIndex()
+            }
+
+            _reset = false
+        }
+
+        if let pipeline = updatePipeline {
+            computeEncoder.setComputePipelineState(pipeline)
+            for iteration in 0 ..< iterations {
+                _ = bind(argumentTable, iteration: iteration)
+                dispatch(metal4ComputeEncoder: computeEncoder, pipeline: pipeline, iteration: iteration)
+                swapSrdDstIndex()
+            }
+        }
+    }
+
     private func bindTextures(_ computeEncoder: MTLComputeCommandEncoder, _ offset: Int) -> Int {
         var index = offset
         var textureIndex = 0
@@ -216,6 +269,36 @@ open class TextureComputeSystem: ComputeSystem {
         else {
             for _ in textureDescriptors {
                 computeEncoder.setTexture(textures[textureIndex], index: index)
+                textureIndex += 1
+                index += 1
+            }
+        }
+
+        return index
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    func bind(_ argumentTable: Metal4ComputeArgumentTable, iteration: Int) -> Int {
+        bindTextures(argumentTable, ComputeTextureIndex.Custom0.rawValue)
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    private func bindTextures(_ argumentTable: Metal4ComputeArgumentTable, _ offset: Int) -> Int {
+        var index = offset
+        var textureIndex = 0
+
+        if feedback {
+            for _ in textureDescriptors {
+                argumentTable.setTexture(textures[textureIndex + srcIndex], index: index)
+                index += 1
+                argumentTable.setTexture(textures[textureIndex + dstIndex], index: index)
+                index += 1
+                textureIndex += 2
+            }
+        }
+        else {
+            for _ in textureDescriptors {
+                argumentTable.setTexture(textures[textureIndex], index: index)
                 textureIndex += 1
                 index += 1
             }
@@ -306,6 +389,16 @@ open class TextureComputeSystem: ComputeSystem {
 
         computeEncoder.dispatchThreads(threadPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
     }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    override open func dispatchThreads(metal4ComputeEncoder: any MTL4ComputeCommandEncoder, pipeline: MTLComputePipelineState, iteration: Int) {
+        guard let texture = textures.first else { return }
+
+        let threadPerGrid = threadsPerGrid ?? getThreadsPerGrid(texture: texture, iteration: iteration)
+        let threadsPerThreadgroup = threadsPerThreadgroup ?? getThreadsPerThreadgroup(texture: texture, pipeline: pipeline, iteration: iteration)
+
+        metal4ComputeEncoder.dispatchThreads(threadsPerGrid: threadPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
+    }
     #endif
 
     override open func dispatchThreadgroups(computeEncoder: MTLComputeCommandEncoder, pipeline: MTLComputePipelineState, iteration: Int) {
@@ -315,6 +408,16 @@ open class TextureComputeSystem: ComputeSystem {
         let threadsPerThreadGroup = threadsPerThreadgroup ?? getThreadsPerThreadgroup(texture: texture, pipeline: pipeline, iteration: iteration)
 
         computeEncoder.dispatchThreadgroups(threadGroupsPerGrid, threadsPerThreadgroup: threadsPerThreadGroup)
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    override open func dispatchThreadgroups(metal4ComputeEncoder: any MTL4ComputeCommandEncoder, pipeline: MTLComputePipelineState, iteration: Int) {
+        guard let texture = textures.first else { return }
+
+        let threadGroupsPerGrid = threadGroupsPerGrid ?? getThreadGroupsPerGrid(texture: texture, pipeline: pipeline, iteration: iteration)
+        let threadsPerThreadGroup = threadsPerThreadgroup ?? getThreadsPerThreadgroup(texture: texture, pipeline: pipeline, iteration: iteration)
+
+        metal4ComputeEncoder.dispatchThreadgroups(threadgroupsPerGrid: threadGroupsPerGrid, threadsPerThreadgroup: threadsPerThreadGroup)
     }
 
     // MARK: - Reset

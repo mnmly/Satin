@@ -1328,6 +1328,7 @@ open class RenderEncoder {
         viewports: [MTLViewport],
         simdViewports: [simd_float4],
         viewMappings: [MTLVertexAmplificationViewMapping],
+        auxiliaryAttachmentIndices: [Int] = [],
         clearWhenEmpty: Bool
     ) -> Bool {
         let originalColorStoreAction = renderPassDescriptor.colorAttachments[0].storeAction
@@ -1351,6 +1352,9 @@ open class RenderEncoder {
                 renderPassDescriptor.colorAttachments[0].loadAction = .load
                 renderPassDescriptor.depthAttachment.loadAction = .load
                 renderPassDescriptor.stencilAttachment.loadAction = .load
+                for attachmentIndex in auxiliaryAttachmentIndices {
+                    colorAttachment(renderPassDescriptor, index: attachmentIndex)?.loadAction = .load
+                }
             }
 
             renderPassDescriptor.colorAttachments[0].storeAction = isFinalEntry ? originalColorStoreAction : .store
@@ -1483,8 +1487,8 @@ open class RenderEncoder {
         viewports: [MTLViewport],
         viewMappings: [MTLVertexAmplificationViewMapping]
     ) -> Bool {
-        guard renderingMode == .forward else {
-            return failFrameCommandDraw("Metal 4 frame-command rendering currently supports forward rendering mode only.")
+        guard renderingMode != .deferredGeometry else {
+            return failFrameCommandDraw("Metal 4 frame-command rendering currently does not support deferred geometry rendering mode.")
         }
 
         guard context.vertexAmplificationCount <= 2 else {
@@ -1518,6 +1522,18 @@ open class RenderEncoder {
                     }
                 }
             }
+        }
+
+        if renderingMode == .forwardPlus {
+            setupAuxiliaryTextures()
+            return drawMetal4ForwardPlus(
+                renderPassDescriptor: renderPassDescriptor,
+                frameCommand: frameCommand,
+                cameras: cameras,
+                viewports: viewports,
+                simdViewports: simdViewports,
+                viewMappings: viewMappings
+            )
         }
 
         let hasAlphaTransparentRenderables = !routePassEntries(route: .alphaTransparent).isEmpty
@@ -1631,6 +1647,166 @@ open class RenderEncoder {
         }
     }
 
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    @discardableResult
+    private func drawMetal4ForwardPlus(
+        renderPassDescriptor: MTLRenderPassDescriptor,
+        frameCommand: Metal4FrameCommand,
+        cameras: [Camera],
+        viewports: [MTLViewport],
+        simdViewports: [simd_float4],
+        viewMappings: [MTLVertexAmplificationViewMapping]
+    ) -> Bool {
+        let hasAlphaTransparentRenderables = !routePassEntries(route: .alphaTransparent).isEmpty
+        let hasClassicTransparentRenderables = !routePassEntries(route: .classicTransparent).isEmpty
+        let hasTransparentRenderables = hasAlphaTransparentRenderables || hasClassicTransparentRenderables
+        let hasSurfaceOpaqueRenderables = !routePassEntries(route: .surfaceOpaque).isEmpty
+        let hasUnlitOpaqueRenderables = !routePassEntries(route: .unlitOpaque).isEmpty
+        let needsSurfacePass = hasSurfaceOpaqueRenderables || usesAuxiliaryAttachments || (!hasUnlitOpaqueRenderables && !hasTransparentRenderables && renderLists.isEmpty)
+        var didEncode = false
+
+        if needsSurfacePass {
+            configureMainAttachments(
+                renderPassDescriptor: renderPassDescriptor,
+                colorLoadAction: colorLoadAction,
+                depthLoadAction: depthLoadAction,
+                stencilLoadAction: stencilLoadAction,
+                colorStoreAction: (hasUnlitOpaqueRenderables || hasTransparentRenderables) ? .store : colorStoreAction,
+                depthStoreAction: (hasUnlitOpaqueRenderables || hasTransparentRenderables) ? .store : depthStoreAction,
+                stencilStoreAction: (hasUnlitOpaqueRenderables || hasTransparentRenderables) ? .store : stencilStoreAction
+            )
+            let auxiliaryAttachmentIndices = configureAuxiliaryAttachments(renderPassDescriptor: renderPassDescriptor)
+            configureMainStoreActionsForSampleCount(renderPassDescriptor: renderPassDescriptor)
+            didEncode = encodeMetal4Route(
+                renderPassDescriptor: renderPassDescriptor,
+                frameCommand: frameCommand,
+                route: .surfaceOpaque,
+                phase: .surfaceOpaque,
+                label: "Surface MRT",
+                cameras: cameras,
+                viewports: viewports,
+                simdViewports: simdViewports,
+                viewMappings: viewMappings,
+                auxiliaryAttachmentIndices: auxiliaryAttachmentIndices,
+                clearWhenEmpty: true
+            )
+        } else {
+            configureAuxiliaryAttachments(renderPassDescriptor: renderPassDescriptor, enabled: false)
+        }
+
+        if hasUnlitOpaqueRenderables {
+            configureMainAttachments(
+                renderPassDescriptor: renderPassDescriptor,
+                colorLoadAction: needsSurfacePass ? .load : colorLoadAction,
+                depthLoadAction: needsSurfacePass ? .load : depthLoadAction,
+                stencilLoadAction: needsSurfacePass ? .load : stencilLoadAction,
+                colorStoreAction: hasTransparentRenderables ? .store : colorStoreAction,
+                depthStoreAction: hasTransparentRenderables ? .store : depthStoreAction,
+                stencilStoreAction: hasTransparentRenderables ? .store : stencilStoreAction
+            )
+            configureAuxiliaryAttachments(renderPassDescriptor: renderPassDescriptor, enabled: false)
+            configureMainStoreActionsForSampleCount(renderPassDescriptor: renderPassDescriptor)
+            let unlitEncoded = encodeMetal4Route(
+                renderPassDescriptor: renderPassDescriptor,
+                frameCommand: frameCommand,
+                route: .unlitOpaque,
+                phase: .unlitOpaque,
+                label: "Opaque Unlit Forward",
+                cameras: cameras,
+                viewports: viewports,
+                simdViewports: simdViewports,
+                viewMappings: viewMappings,
+                clearWhenEmpty: !didEncode
+            )
+            didEncode = didEncode || unlitEncoded
+        }
+
+        if hasAlphaTransparentRenderables {
+            configureMainAttachments(
+                renderPassDescriptor: renderPassDescriptor,
+                colorLoadAction: didEncode ? .load : colorLoadAction,
+                depthLoadAction: didEncode ? .load : depthLoadAction,
+                stencilLoadAction: didEncode ? .load : stencilLoadAction,
+                colorStoreAction: hasClassicTransparentRenderables ? .store : colorStoreAction,
+                depthStoreAction: hasClassicTransparentRenderables ? .store : depthStoreAction,
+                stencilStoreAction: hasClassicTransparentRenderables ? .store : stencilStoreAction
+            )
+            configureAuxiliaryAttachments(renderPassDescriptor: renderPassDescriptor, enabled: false)
+            configureMainStoreActionsForSampleCount(renderPassDescriptor: renderPassDescriptor)
+            let alphaEncoded = encodeMetal4AlphaOitRoute(
+                renderPassDescriptor: renderPassDescriptor,
+                frameCommand: frameCommand,
+                cameras: cameras,
+                viewports: viewports,
+                simdViewports: simdViewports,
+                viewMappings: viewMappings,
+                clearWhenEmpty: !didEncode,
+                colorLoadAction: didEncode ? .load : colorLoadAction,
+                depthLoadAction: didEncode ? .load : depthLoadAction,
+                stencilLoadAction: didEncode ? .load : stencilLoadAction,
+                colorStoreAction: hasClassicTransparentRenderables ? .store : colorStoreAction,
+                depthStoreAction: hasClassicTransparentRenderables ? .store : depthStoreAction,
+                stencilStoreAction: hasClassicTransparentRenderables ? .store : stencilStoreAction
+            )
+            didEncode = didEncode || alphaEncoded
+        }
+
+        if hasClassicTransparentRenderables {
+            configureMainAttachments(
+                renderPassDescriptor: renderPassDescriptor,
+                colorLoadAction: didEncode ? .load : colorLoadAction,
+                depthLoadAction: didEncode ? .load : depthLoadAction,
+                stencilLoadAction: didEncode ? .load : stencilLoadAction,
+                colorStoreAction: colorStoreAction,
+                depthStoreAction: depthStoreAction,
+                stencilStoreAction: stencilStoreAction
+            )
+            configureAuxiliaryAttachments(renderPassDescriptor: renderPassDescriptor, enabled: false)
+            configureMainStoreActionsForSampleCount(renderPassDescriptor: renderPassDescriptor)
+            let transparentEncoded = encodeMetal4Route(
+                renderPassDescriptor: renderPassDescriptor,
+                frameCommand: frameCommand,
+                route: .classicTransparent,
+                phase: .classicTransparent,
+                label: "Classic Transparent Forward",
+                cameras: cameras,
+                viewports: viewports,
+                simdViewports: simdViewports,
+                viewMappings: viewMappings,
+                clearWhenEmpty: !didEncode
+            )
+            didEncode = didEncode || transparentEncoded
+        }
+
+        if !didEncode {
+            configureMainAttachments(
+                renderPassDescriptor: renderPassDescriptor,
+                colorLoadAction: colorLoadAction,
+                depthLoadAction: depthLoadAction,
+                stencilLoadAction: stencilLoadAction,
+                colorStoreAction: colorStoreAction,
+                depthStoreAction: depthStoreAction,
+                stencilStoreAction: stencilStoreAction
+            )
+            configureAuxiliaryAttachments(renderPassDescriptor: renderPassDescriptor, enabled: false)
+            configureMainStoreActionsForSampleCount(renderPassDescriptor: renderPassDescriptor)
+            return encodeMetal4Route(
+                renderPassDescriptor: renderPassDescriptor,
+                frameCommand: frameCommand,
+                route: .surfaceOpaque,
+                phase: .surfaceOpaque,
+                label: "Empty",
+                cameras: cameras,
+                viewports: viewports,
+                simdViewports: simdViewports,
+                viewMappings: viewMappings,
+                clearWhenEmpty: true
+            )
+        }
+
+        return didEncode
+    }
+
     @discardableResult
     private func failFrameCommandDraw(_ reason: String) -> Bool {
         lastFrameCommandDrawFailure = reason
@@ -1733,6 +1909,7 @@ open class RenderEncoder {
         viewports: [MTLViewport],
         simdViewports: [simd_float4],
         viewMappings: [MTLVertexAmplificationViewMapping],
+        auxiliaryAttachmentIndices: [Int] = [],
         clearWhenEmpty: Bool
     ) -> Bool {
         let routeEntries = routePassEntries(route: route)
@@ -1751,6 +1928,9 @@ open class RenderEncoder {
                 renderPassDescriptor.colorAttachments[0].loadAction = .load
                 renderPassDescriptor.depthAttachment.loadAction = .load
                 renderPassDescriptor.stencilAttachment.loadAction = .load
+                for attachmentIndex in auxiliaryAttachmentIndices {
+                    colorAttachment(renderPassDescriptor, index: attachmentIndex)?.loadAction = .load
+                }
             }
 
             guard let renderCommand = makeMetal4RenderCommand(renderPassDescriptor: renderPassDescriptor, frameCommand: frameCommand) else {

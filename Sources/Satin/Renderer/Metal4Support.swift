@@ -45,4 +45,26 @@ internal final class Metal4Support {
         frameCommand.begin()
         return frameCommand
     }
+
+    func makeRenderCommand(
+        renderPassDescriptor: MTLRenderPassDescriptor,
+        options: MTL4RenderEncoderOptions = []
+    ) -> Metal4RenderCommand? {
+        let metal4Descriptor = Metal4RenderPassBridge.makeDescriptor(from: renderPassDescriptor)
+        guard let renderEncoder = commandBuffer.makeRenderCommandEncoder(
+            descriptor: metal4Descriptor,
+            options: options
+        ) else { return nil }
+
+        return Metal4RenderCommand(
+            renderPassDescriptor: metal4Descriptor,
+            renderEncoder: renderEncoder
+        )
+    }
+}
+
+@available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+internal struct Metal4RenderCommand {
+    let renderPassDescriptor: MTL4RenderPassDescriptor
+    let renderEncoder: any MTL4RenderCommandEncoder
 }

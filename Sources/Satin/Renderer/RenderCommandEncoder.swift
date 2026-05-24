@@ -108,3 +108,94 @@ internal final class MetalRenderCommandEncoder: SatinRenderCommandEncoder {
         )
     }
 }
+
+@available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+internal final class Metal4RenderCommandEncoder: SatinRenderCommandEncoder {
+    private let renderEncoder: any MTL4RenderCommandEncoder
+    private let argumentTables: Metal4ArgumentTables
+
+    init(renderEncoder: any MTL4RenderCommandEncoder, argumentTables: Metal4ArgumentTables) {
+        self.renderEncoder = renderEncoder
+        self.argumentTables = argumentTables
+        argumentTables.bind(to: renderEncoder)
+    }
+
+    func setCullMode(_ cullMode: MTLCullMode) {
+        renderEncoder.setCullMode(cullMode)
+    }
+
+    func setFrontFacing(_ windingOrder: MTLWinding) {
+        renderEncoder.setFrontFacing(windingOrder)
+    }
+
+    func setTriangleFillMode(_ triangleFillMode: MTLTriangleFillMode) {
+        renderEncoder.setTriangleFillMode(triangleFillMode)
+    }
+
+    func setRenderPipelineState(_ pipeline: MTLRenderPipelineState) {
+        renderEncoder.setRenderPipelineState(pipeline)
+    }
+
+    func setDepthStencilState(_ depthStencilState: MTLDepthStencilState?) {
+        renderEncoder.setDepthStencilState(depthStencilState)
+    }
+
+    func setDepthClipMode(_ depthClipMode: MTLDepthClipMode) {
+        renderEncoder.setDepthClipMode(depthClipMode)
+    }
+
+    func setDepthBias(_ depthBias: Float, slopeScale: Float, clamp: Float) {
+        renderEncoder.setDepthBias(depthBias, slopeScale: slopeScale, clamp: clamp)
+    }
+
+    func setVertexBuffer(_ buffer: MTLBuffer, offset: Int, index: Int) {
+        guard let vertexBufferIndex = VertexBufferIndex(rawValue: index) else { return }
+        argumentTables.setVertexBuffer(buffer, offset: offset, index: vertexBufferIndex)
+    }
+
+    func setFragmentBuffer(_ buffer: MTLBuffer, offset: Int, index: Int) {
+        guard let fragmentBufferIndex = FragmentBufferIndex(rawValue: index) else { return }
+        argumentTables.setFragmentBuffer(buffer, offset: offset, index: fragmentBufferIndex)
+    }
+
+    func setVertexTexture(_ texture: MTLTexture?, index: Int) {
+        guard let vertexTextureIndex = VertexTextureIndex(rawValue: index) else { return }
+        argumentTables.setVertexTexture(texture, index: vertexTextureIndex)
+    }
+
+    func setFragmentTexture(_ texture: MTLTexture?, index: Int) {
+        guard let fragmentTextureIndex = FragmentTextureIndex(rawValue: index) else { return }
+        argumentTables.setFragmentTexture(texture, index: fragmentTextureIndex)
+    }
+
+    func drawPrimitives(type: MTLPrimitiveType, vertexStart: Int, vertexCount: Int, instanceCount: Int) {
+        renderEncoder.drawPrimitives(
+            primitiveType: type,
+            vertexStart: vertexStart,
+            vertexCount: vertexCount,
+            instanceCount: instanceCount
+        )
+    }
+
+    func drawIndexedPrimitives(
+        type: MTLPrimitiveType,
+        indexCount: Int,
+        indexType: MTLIndexType,
+        indexBuffer: MTLBuffer,
+        indexBufferOffset: Int,
+        instanceCount: Int
+    ) {
+        renderEncoder.drawIndexedPrimitives(
+            primitiveType: type,
+            indexCount: indexCount,
+            indexType: indexType,
+            indexBuffer: indexBuffer.gpuAddress + MTLGPUAddress(indexBufferOffset),
+            indexBufferLength: Self.indexBufferLength(indexBuffer: indexBuffer, offset: indexBufferOffset),
+            instanceCount: instanceCount
+        )
+    }
+
+    static func indexBufferLength(indexBuffer: MTLBuffer, offset: Int) -> Int {
+        max(0, indexBuffer.length - offset)
+    }
+}

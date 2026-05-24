@@ -131,7 +131,7 @@ open class Renderer {
         makeMetalFrameCommand()?.commandBuffer
     }
 
-    open func draw(texture: MTLTexture, commandBuffer: MTLCommandBuffer) {
+    open func makeRenderPassDescriptor(texture: MTLTexture) -> MTLRenderPassDescriptor {
         let renderPassDescriptor = MTLRenderPassDescriptor()
         let index = frameIndex % maxBuffersInFlight
 
@@ -154,16 +154,26 @@ open class Renderer {
         renderPassDescriptor.stencilAttachment.loadAction = .clear
         renderPassDescriptor.stencilAttachment.clearStencil = 0
 
+        return renderPassDescriptor
+    }
+
+    open func draw(texture: MTLTexture, commandBuffer: MTLCommandBuffer) {
+        let renderPassDescriptor = makeRenderPassDescriptor(texture: texture)
         draw(renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
     }
 
     open func draw(renderPassDescriptor: MTLRenderPassDescriptor, commandBuffer: MTLCommandBuffer) {}
 
     @discardableResult
-    open func draw(texture: MTLTexture, frameCommand: any SatinFrameCommand) -> Bool {
+    open func draw(renderPassDescriptor: MTLRenderPassDescriptor, frameCommand: any SatinFrameCommand) -> Bool {
         guard let frameCommand = frameCommand as? MetalFrameCommand else { return false }
-        draw(texture: texture, commandBuffer: frameCommand.commandBuffer)
+        draw(renderPassDescriptor: renderPassDescriptor, commandBuffer: frameCommand.commandBuffer)
         return true
+    }
+
+    @discardableResult
+    open func draw(texture: MTLTexture, frameCommand: any SatinFrameCommand) -> Bool {
+        draw(renderPassDescriptor: makeRenderPassDescriptor(texture: texture), frameCommand: frameCommand)
     }
 
     open func postDraw(commandBuffer: MTLCommandBuffer) {

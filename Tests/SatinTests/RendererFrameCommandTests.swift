@@ -38,6 +38,22 @@ final class RendererFrameCommandTests: XCTestCase {
         XCTAssertEqual(frameCommand.commandBuffer.status, .completed)
     }
 
+    func testRendererBuildsRenderPassDescriptorForFrameCommandDraw() throws {
+        let device = try XCTUnwrap(makeDevice())
+        let context = Context(device: device, sampleCount: 1, colorPixelFormat: .bgra8Unorm, depthPixelFormat: .depth32Float)
+        let renderer = TestRenderer(context: context)
+        renderer.frameIndex = 0
+        let texture = try XCTUnwrap(makeTexture(device: device))
+
+        let renderPassDescriptor = renderer.makeRenderPassDescriptor(texture: texture)
+
+        XCTAssertTrue(renderPassDescriptor.colorAttachments[0].texture === texture)
+        XCTAssertEqual(renderPassDescriptor.renderTargetWidth, texture.width)
+        XCTAssertEqual(renderPassDescriptor.renderTargetHeight, texture.height)
+        XCTAssertNotNil(renderPassDescriptor.depthAttachment.texture)
+        XCTAssertEqual(renderPassDescriptor.stencilAttachment.loadAction, .clear)
+    }
+
     func testRenderEncoderDrawsWithBackendFrameCommand() throws {
         let device = try XCTUnwrap(makeDevice())
         let context = Context(device: device, sampleCount: 1, colorPixelFormat: .bgra8Unorm)

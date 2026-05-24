@@ -5,6 +5,14 @@ import XCTest
 final class RendererFrameCommandTests: XCTestCase {
     final class TestRenderer: Renderer {}
 
+    final class FallbackTestRenderer: Renderer {
+        var commandBufferDrawCount = 0
+
+        override func draw(texture: MTLTexture, commandBuffer: MTLCommandBuffer) {
+            commandBufferDrawCount += 1
+        }
+    }
+
     private func makeDevice() -> MTLDevice? {
         MTLCreateSystemDefaultDevice()
     }
@@ -116,6 +124,33 @@ final class RendererFrameCommandTests: XCTestCase {
         )
 
         renderer.commitFrameCommand(frameCommand)
+    }
+
+    func testRendererBuildsFallbackCommandBufferForFailedMetal4Draw() throws {
+        guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) else {
+            throw XCTSkip("Metal 4 requires OS 26 or newer.")
+        }
+
+        let device = try XCTUnwrap(makeDevice())
+        let context = Context(device: device, backend: .metal4, sampleCount: 1, colorPixelFormat: .bgra8Unorm)
+        guard context.backend == .metal4 else {
+            throw XCTSkip("Metal 4 command queues are not available on this device.")
+        }
+
+        let renderer = FallbackTestRenderer(context: context)
+        let frameCommand = try XCTUnwrap(renderer.makeFrameCommand() as? Metal4FrameCommand)
+        let fallbackCommandBuffer = try XCTUnwrap(renderer.makeFallbackCommandBuffer(
+            texture: try XCTUnwrap(makeTexture(device: device)),
+            failedFrameCommand: frameCommand
+        ))
+
+        XCTAssertEqual(renderer.commandBufferDrawCount, 1)
+
+        renderer.commitFrameCommand(frameCommand)
+        fallbackCommandBuffer.commit()
+        fallbackCommandBuffer.waitUntilCompleted()
+
+        XCTAssertEqual(fallbackCommandBuffer.status, .completed)
     }
 
     private func makeTexture(device: MTLDevice) -> MTLTexture? {

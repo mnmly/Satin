@@ -60,6 +60,15 @@ open class ViewRenderer: Renderer, ViewRendererDelegate {
         postDraw(frameCommand: frameCommand)
     }
 
+    open func postDrawFallback(
+        drawable: CAMetalDrawable,
+        commandBuffer: MTLCommandBuffer,
+        failedFrameCommand: any SatinFrameCommand
+    ) {
+        commandBuffer.present(drawable)
+        commandBuffer.commit()
+    }
+
     // MARK: - Events
 
 #if os(macOS)
@@ -133,6 +142,16 @@ open class ViewRenderer: Renderer, ViewRendererDelegate {
         let didDraw = draw(texture: drawable.texture, frameCommand: frameCommand)
         if didDraw {
             postDraw(drawable: drawable, frameCommand: frameCommand)
+        } else if let fallbackCommandBuffer = makeFallbackCommandBuffer(
+            texture: drawable.texture,
+            failedFrameCommand: frameCommand
+        ) {
+            postDraw(frameCommand: frameCommand)
+            postDrawFallback(
+                drawable: drawable,
+                commandBuffer: fallbackCommandBuffer,
+                failedFrameCommand: frameCommand
+            )
         } else {
             postDraw(frameCommand: frameCommand)
         }

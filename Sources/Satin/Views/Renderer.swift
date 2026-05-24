@@ -176,6 +176,21 @@ open class Renderer {
         draw(renderPassDescriptor: makeRenderPassDescriptor(texture: texture), frameCommand: frameCommand)
     }
 
+    open var fallsBackToCommandBufferDrawWhenFrameCommandDrawFails: Bool { true }
+
+    open func makeFallbackCommandBuffer(
+        texture: MTLTexture,
+        failedFrameCommand: any SatinFrameCommand
+    ) -> MTLCommandBuffer? {
+        guard fallsBackToCommandBufferDrawWhenFrameCommandDrawFails,
+              failedFrameCommand.backend == .metal4,
+              let commandBuffer = commandQueue.makeCommandBuffer()
+        else { return nil }
+
+        draw(texture: texture, commandBuffer: commandBuffer)
+        return commandBuffer
+    }
+
     open func postDraw(commandBuffer: MTLCommandBuffer) {
         commitFrameCommand(MetalFrameCommand(frameIndex: frameIndex, commandBuffer: commandBuffer))
     }

@@ -76,6 +76,17 @@ open class MotionBlurPostProcessEncoder: PostProcessEncoder {
         super.draw(renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer, renderTarget: outputTexture)
     }
 
+    @discardableResult
+    override open func draw(renderPassDescriptor: MTLRenderPassDescriptor, frameCommand: any SatinFrameCommand) -> Bool {
+        guard let outputTexture else { return true }
+
+        motionBlurMaterial.blueNoiseTexture = blueNoiseTexture
+        motionBlurMaterial.depthTexture = resolveDepthTexture(frameCommand: frameCommand)
+        motionBlurMaterial.frame = frameCounter
+        frameCounter = frameCounter &+ 1
+        return super.draw(renderPassDescriptor: renderPassDescriptor, frameCommand: frameCommand, renderTarget: outputTexture)
+    }
+
     // MARK: - Helpers
 
     private func makeOutputTexture(device: MTLDevice, width: Int, height: Int) -> MTLTexture? {
@@ -121,6 +132,48 @@ open class MotionBlurPostProcessEncoder: PostProcessEncoder {
             commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)?.endEncoding()
         }
 
+        return fallbackDepthTexture
+    }
+
+    private func resolveDepthTexture(frameCommand: any SatinFrameCommand) -> MTLTexture? {
+        if let depthTexture {
+            return depthTexture
+        }
+
+        if fallbackDepthTexture == nil {
+            let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: .depth32Float,
+                width: 1,
+                height: 1,
+                mipmapped: false
+            )
+            descriptor.usage = [.renderTarget, .shaderRead]
+            descriptor.storageMode = .private
+            fallbackDepthTexture = context.device.makeTexture(descriptor: descriptor)
+            fallbackDepthTexture?.label = label + " Fallback Depth"
+        }
+
+        guard let fallbackDepthTexture else { return nil }
+
+        let renderPassDescriptor = MTLRenderPassDescriptor()
+        renderPassDescriptor.depthAttachment.texture = fallbackDepthTexture
+        renderPassDescriptor.depthAttachment.loadAction = .clear
+        renderPassDescriptor.depthAttachment.storeAction = .store
+        renderPassDescriptor.depthAttachment.clearDepth = 0.0
+
+        if let frameCommand = frameCommand as? MetalFrameCommand {
+            frameCommand.commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)?.endEncoding()
+            return fallbackDepthTexture
+        }
+
+        guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
+              let frameCommand = frameCommand as? Metal4FrameCommand,
+              let renderEncoder = frameCommand.commandBuffer.makeRenderCommandEncoder(
+                descriptor: Metal4RenderPassBridge.makeDescriptor(from: renderPassDescriptor)
+              )
+        else { return fallbackDepthTexture }
+
+        renderEncoder.endEncoding()
         return fallbackDepthTexture
     }
 

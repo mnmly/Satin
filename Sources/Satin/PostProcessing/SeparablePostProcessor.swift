@@ -85,6 +85,29 @@ final class SeparablePostProcessEncoder {
         )
     }
 
+    @discardableResult
+    func draw(
+        frameCommand: any SatinFrameCommand,
+        inputTexture: MTLTexture,
+        configurePass: (Pass, MTLTexture) -> Void
+    ) -> Bool {
+        guard let intermediateTexture, let outputTexture else { return true }
+
+        configurePass(.horizontal, inputTexture)
+        guard horizontalProcessor.draw(
+            renderPassDescriptor: MTLRenderPassDescriptor(),
+            frameCommand: frameCommand,
+            renderTarget: intermediateTexture
+        ) else { return false }
+
+        configurePass(.vertical, intermediateTexture)
+        return verticalProcessor.draw(
+            renderPassDescriptor: MTLRenderPassDescriptor(),
+            frameCommand: frameCommand,
+            renderTarget: outputTexture
+        )
+    }
+
     private func makeTexture(width: Int, height: Int, label: String) -> MTLTexture? {
         guard width > 0, height > 0 else { return nil }
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(

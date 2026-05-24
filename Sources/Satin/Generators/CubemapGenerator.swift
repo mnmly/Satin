@@ -62,4 +62,29 @@ public final class CubemapGenerator {
 
         destinationTexture.label = "Cubemap"
     }
+
+    @discardableResult
+    public func encode(frameCommand: any SatinFrameCommand, sourceTexture: MTLTexture, destinationTexture: MTLTexture) -> Bool {
+        guard blur == nil else { return false }
+
+        compute.set(destinationTexture, index: ComputeTextureIndex.Custom0) // output
+        compute.set(sourceTexture, index: ComputeTextureIndex.Custom1) // input
+        guard compute.update(frameCommand) else { return false }
+
+        if destinationTexture.mipmapLevelCount > 1 {
+            if let frameCommand = frameCommand as? MetalFrameCommand,
+               let blitEncoder = frameCommand.commandBuffer.makeBlitCommandEncoder() {
+                blitEncoder.generateMipmaps(for: destinationTexture)
+                blitEncoder.endEncoding()
+            } else if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
+                      let frameCommand = frameCommand as? Metal4FrameCommand,
+                      let computeEncoder = frameCommand.commandBuffer.makeComputeCommandEncoder() {
+                computeEncoder.generateMipmaps(texture: destinationTexture)
+                computeEncoder.endEncoding()
+            }
+        }
+
+        destinationTexture.label = "Cubemap"
+        return true
+    }
 }

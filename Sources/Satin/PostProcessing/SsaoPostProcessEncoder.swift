@@ -200,6 +200,41 @@ open class SsaoPostProcessEncoder: PostProcessEncoder {
         )
     }
 
+    @discardableResult
+    override open func draw(renderPassDescriptor: MTLRenderPassDescriptor, frameCommand: any SatinFrameCommand) -> Bool {
+        let blurOutputTexture = blurProcessor.outputTexture
+        let hasAOInputs = depthTexture != nil && normalTexture != nil && rawTexture != nil && blurOutputTexture != nil
+        aoTexture = hasAOInputs ? blurOutputTexture : nil
+
+        if hasAOInputs, let rawTexture {
+            if let cam = sceneCamera {
+                ssaoMaterial.update(camera: cam)
+            }
+
+            guard super.draw(
+                renderPassDescriptor: MTLRenderPassDescriptor(),
+                frameCommand: frameCommand,
+                renderTarget: rawTexture
+            ) else { return false }
+
+            guard blurProcessor.draw(frameCommand: frameCommand, inputTexture: rawTexture, configurePass: { [blurMaterial] pass, inputTexture in
+                blurMaterial.ssaoTexture = inputTexture
+                blurMaterial.direction = pass == .horizontal ? simd_float2(1.0, 0.0) : simd_float2(0.0, 1.0)
+            }) else { return false }
+        }
+
+        guard let colorTexture, let outputTexture else { return true }
+        guard let compositeAOTexture = hasAOInputs ? aoTexture : fallbackAOTexture() else { return true }
+
+        compositeMaterial.colorTexture = colorTexture
+        compositeMaterial.aoTexture = compositeAOTexture
+        return compositeProcessor.draw(
+            renderPassDescriptor: MTLRenderPassDescriptor(),
+            frameCommand: frameCommand,
+            renderTarget: outputTexture
+        )
+    }
+
     // MARK: - Helpers
 
     private func fallbackAOTexture() -> MTLTexture? {

@@ -233,6 +233,53 @@ open class SsgiPostProcessEncoder: PostProcessEncoder {
         )
     }
 
+    @discardableResult
+    override open func draw(renderPassDescriptor: MTLRenderPassDescriptor, frameCommand: any SatinFrameCommand) -> Bool {
+        let hasInputs = colorTexture != nil &&
+            depthTexture != nil &&
+            normalTexture != nil &&
+            albedoTexture != nil &&
+            pbrTexture != nil &&
+            rawTexture != nil &&
+            denoisedTexture != nil &&
+            sceneCamera != nil
+
+        ssgiTexture = hasInputs ? denoisedTexture : nil
+
+        if hasInputs, let rawTexture, let denoisedTexture, let sceneCamera {
+            ssgiMaterial.update(camera: sceneCamera, viewportHeight: Float(rawTexture.height))
+
+            guard super.draw(
+                renderPassDescriptor: MTLRenderPassDescriptor(),
+                frameCommand: frameCommand,
+                renderTarget: rawTexture
+            ) else { return false }
+
+            blurMaterial.ssgiTexture = rawTexture
+            blurMaterial.blueNoiseTexture = blueNoiseTexture
+            blurMaterial.noiseIndex = Int32(frameIndex & 3)
+            blurMaterial.update(camera: sceneCamera)
+            guard blurProcessor.draw(
+                renderPassDescriptor: MTLRenderPassDescriptor(),
+                frameCommand: frameCommand,
+                renderTarget: denoisedTexture
+            ) else { return false }
+
+            frameIndex &+= 1
+        }
+
+        guard let colorTexture, let outputTexture else { return true }
+        guard let compositeSsgiTexture = hasInputs ? ssgiTexture : fallbackNeutralTexture() else { return true }
+
+        compositeMaterial.colorTexture = colorTexture
+        compositeMaterial.ssgiTexture = compositeSsgiTexture
+        return compositeProcessor.draw(
+            renderPassDescriptor: MTLRenderPassDescriptor(),
+            frameCommand: frameCommand,
+            renderTarget: outputTexture
+        )
+    }
+
     private func fallbackNeutralTexture() -> MTLTexture? {
         if let neutralTexture {
             return neutralTexture

@@ -556,6 +556,71 @@ final class RendererFrameCommandTests: XCTestCase {
         renderer.commitFrameCommand(frameCommand)
     }
 
+    func testMetal4FrameCommandSupportsCubemapGenerator() throws {
+        guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) else {
+            throw XCTSkip("Metal 4 requires OS 26 or newer.")
+        }
+
+        let device = try XCTUnwrap(makeDevice())
+        let context = Context(device: device, backend: .metal4, sampleCount: 1, colorPixelFormat: .bgra8Unorm)
+        guard context.backend == .metal4 else {
+            throw XCTSkip("Metal 4 command queues are not available on this device.")
+        }
+
+        let renderer = TestRenderer(context: context)
+        let frameCommand = try XCTUnwrap(renderer.makeFrameCommand() as? Metal4FrameCommand)
+        let generator = CubemapGenerator(device: device)
+        let destinationTexture = try XCTUnwrap(makeCubeTexture(device: device, mipmapped: true))
+
+        XCTAssertTrue(generator.encode(
+            frameCommand: frameCommand,
+            sourceTexture: try XCTUnwrap(makeCubeTexture(device: device, mipmapped: true)),
+            destinationTexture: destinationTexture
+        ))
+        XCTAssertEqual(destinationTexture.mipmapLevelCount, 3)
+
+        renderer.commitFrameCommand(frameCommand)
+    }
+
+    func testMetal4FrameCommandSupportsExtendedPostProcessors() throws {
+        guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) else {
+            throw XCTSkip("Metal 4 requires OS 26 or newer.")
+        }
+
+        let device = try XCTUnwrap(makeDevice())
+        let context = Context(device: device, backend: .metal4, sampleCount: 1, colorPixelFormat: .bgra8Unorm)
+        guard context.backend == .metal4 else {
+            throw XCTSkip("Metal 4 command queues are not available on this device.")
+        }
+
+        let renderer = TestRenderer(context: context)
+        let frameCommand = try XCTUnwrap(renderer.makeFrameCommand() as? Metal4FrameCommand)
+        let outputRenderPassDescriptor = renderer.makeRenderPassDescriptor(texture: try XCTUnwrap(makeTexture(device: device)))
+        let colorTexture = try XCTUnwrap(makeShaderTexture(device: device, pixelFormat: .bgra8Unorm))
+
+        let ssao = SsaoPostProcessEncoder(context: context)
+        ssao.resize(size: (width: 4, height: 4), scaleFactor: 1.0)
+        ssao.colorTexture = colorTexture
+        XCTAssertTrue(ssao.draw(renderPassDescriptor: outputRenderPassDescriptor, frameCommand: frameCommand))
+
+        let ssgi = SsgiPostProcessEncoder(context: context)
+        ssgi.resize(size: (width: 4, height: 4), scaleFactor: 1.0)
+        ssgi.colorTexture = colorTexture
+        XCTAssertTrue(ssgi.draw(renderPassDescriptor: outputRenderPassDescriptor, frameCommand: frameCommand))
+
+        let motionBlur = MotionBlurPostProcessEncoder(context: context)
+        motionBlur.resize(size: (width: 4, height: 4), scaleFactor: 1.0)
+        motionBlur.colorTexture = colorTexture
+        motionBlur.velocityTexture = try XCTUnwrap(makeShaderTexture(device: device, pixelFormat: .rg16Float))
+        XCTAssertTrue(motionBlur.draw(renderPassDescriptor: outputRenderPassDescriptor, frameCommand: frameCommand))
+
+        let bokeh = BokehDepthOfFieldPostProcessEncoder(context: context)
+        bokeh.resize(size: (width: 4, height: 4), scaleFactor: 1.0)
+        XCTAssertTrue(bokeh.draw(renderPassDescriptor: outputRenderPassDescriptor, frameCommand: frameCommand))
+
+        renderer.commitFrameCommand(frameCommand)
+    }
+
     private func makeTexture(device: MTLDevice) -> MTLTexture? {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .bgra8Unorm,
@@ -575,6 +640,17 @@ final class RendererFrameCommandTests: XCTestCase {
             mipmapped: false
         )
         descriptor.usage = [.shaderRead, .shaderWrite]
+        return device.makeTexture(descriptor: descriptor)
+    }
+
+    private func makeShaderTexture(device: MTLDevice, pixelFormat: MTLPixelFormat) -> MTLTexture? {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: pixelFormat,
+            width: 4,
+            height: 4,
+            mipmapped: false
+        )
+        descriptor.usage = [.shaderRead, .shaderWrite, .renderTarget]
         return device.makeTexture(descriptor: descriptor)
     }
 

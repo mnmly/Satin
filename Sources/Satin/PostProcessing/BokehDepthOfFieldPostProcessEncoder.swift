@@ -368,6 +368,103 @@ open class BokehDepthOfFieldPostProcessEncoder: PostProcessEncoder {
         )
     }
 
+    @discardableResult
+    override open func draw(renderPassDescriptor: MTLRenderPassDescriptor, frameCommand: any SatinFrameCommand) -> Bool {
+        resizeResourcesIfNeeded(force: false)
+
+        guard let colorTexture,
+              let depthTexture,
+              let sceneCamera,
+              let outputTexture,
+              let fullResolutionCoCTexture,
+              let downsampledCoCTexture,
+              let sourceColorTexture,
+              let colorMulFarTexture,
+              let nearCoCBoxIntermediateTexture,
+              let nearCoCBoxTexture,
+              let nearCoCMaxIntermediateTexture,
+              let nearCoCTexture,
+              let farWeightsTexture,
+              farHorizontalTextures.count == 3,
+              nearHorizontalTextures.count == 3
+        else { return true }
+
+        let resolvedSettings = resolvedSettings()
+
+        generateCoCProcessor.set("Near Plane", sceneCamera.near)
+        generateCoCProcessor.set("Far Plane", sceneCamera.far)
+        generateCoCProcessor.set("Near Begin", resolvedSettings.nearBegin)
+        generateCoCProcessor.set("Near End", resolvedSettings.nearEnd)
+        generateCoCProcessor.set("Far Begin", resolvedSettings.farBegin)
+        generateCoCProcessor.set("Far End", resolvedSettings.farEnd)
+        generateCoCProcessor.set(fullResolutionCoCTexture, index: .Custom0)
+        generateCoCProcessor.set(depthTexture, index: .Custom1)
+        guard generateCoCProcessor.update(frameCommand) else { return false }
+
+        downsampleProcessor.set("Far Boost", Float(5.0))
+        downsampleProcessor.set(downsampledCoCTexture, index: .Custom0)
+        downsampleProcessor.set(sourceColorTexture, index: .Custom1)
+        downsampleProcessor.set(colorMulFarTexture, index: .Custom2)
+        downsampleProcessor.set(fullResolutionCoCTexture, index: .Custom3)
+        downsampleProcessor.set(colorTexture, index: .Custom4)
+        guard downsampleProcessor.update(frameCommand) else { return false }
+
+        let nearFilterRadius = nearCoCFilterRadius(for: resolvedSettings)
+        nearCoCBoxHorizontalProcessor.set(nearCoCBoxIntermediateTexture, index: .Custom0)
+        nearCoCBoxHorizontalProcessor.set("Filter Radius", nearFilterRadius)
+        nearCoCBoxHorizontalProcessor.set(downsampledCoCTexture, index: .Custom1)
+        guard nearCoCBoxHorizontalProcessor.update(frameCommand) else { return false }
+
+        nearCoCBoxVerticalProcessor.set(nearCoCBoxTexture, index: .Custom0)
+        nearCoCBoxVerticalProcessor.set("Filter Radius", nearFilterRadius)
+        nearCoCBoxVerticalProcessor.set(nearCoCBoxIntermediateTexture, index: .Custom1)
+        guard nearCoCBoxVerticalProcessor.update(frameCommand) else { return false }
+
+        nearCoCMaxHorizontalProcessor.set(nearCoCMaxIntermediateTexture, index: .Custom0)
+        nearCoCMaxHorizontalProcessor.set("Filter Radius", nearFilterRadius)
+        nearCoCMaxHorizontalProcessor.set(nearCoCBoxTexture, index: .Custom1)
+        guard nearCoCMaxHorizontalProcessor.update(frameCommand) else { return false }
+
+        nearCoCMaxVerticalProcessor.set(nearCoCTexture, index: .Custom0)
+        nearCoCMaxVerticalProcessor.set("Filter Radius", nearFilterRadius)
+        nearCoCMaxVerticalProcessor.set(nearCoCMaxIntermediateTexture, index: .Custom1)
+        guard nearCoCMaxVerticalProcessor.update(frameCommand) else { return false }
+
+        horizontalProcessor.set("Max Radius", resolvedSettings.maxRadius)
+        horizontalProcessor.set(farHorizontalTextures[0], index: .Custom0)
+        horizontalProcessor.set(farHorizontalTextures[1], index: .Custom1)
+        horizontalProcessor.set(farHorizontalTextures[2], index: .Custom2)
+        horizontalProcessor.set(nearHorizontalTextures[0], index: .Custom3)
+        horizontalProcessor.set(nearHorizontalTextures[1], index: .Custom4)
+        horizontalProcessor.set(nearHorizontalTextures[2], index: .Custom5)
+        horizontalProcessor.set(farWeightsTexture, index: .Custom6)
+        horizontalProcessor.set(sourceColorTexture, index: .Custom7)
+        horizontalProcessor.set(downsampledCoCTexture, index: .Custom8)
+        horizontalProcessor.set(nearCoCTexture, index: .Custom9)
+        horizontalProcessor.set(colorMulFarTexture, index: .Custom10)
+        guard horizontalProcessor.update(frameCommand) else { return false }
+
+        compositeMaterial.colorTexture = colorTexture
+        compositeMaterial.cocTexture = downsampledCoCTexture
+        compositeMaterial.farRTexture = farHorizontalTextures[0]
+        compositeMaterial.farGTexture = farHorizontalTextures[1]
+        compositeMaterial.farBTexture = farHorizontalTextures[2]
+        compositeMaterial.nearRTexture = nearHorizontalTextures[0]
+        compositeMaterial.nearGTexture = nearHorizontalTextures[1]
+        compositeMaterial.nearBTexture = nearHorizontalTextures[2]
+        compositeMaterial.nearCoCTexture = nearCoCTexture
+        compositeMaterial.farWeightsTexture = farWeightsTexture
+        compositeMaterial.nearCoCBoxTexture = nearCoCBoxTexture
+        compositeMaterial.maxBlurRadius = resolvedSettings.maxRadius
+        compositeMaterial.blend = resolvedSettings.blend
+
+        return super.draw(
+            renderPassDescriptor: MTLRenderPassDescriptor(),
+            frameCommand: frameCommand,
+            renderTarget: outputTexture
+        )
+    }
+
     func resolvedSettings() -> ResolvedDOFSettings {
         let cocBands = explicitCoCBands ?? deriveCompatibilityCoCBands(
             focusDistance: focusDistance,

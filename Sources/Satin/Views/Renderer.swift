@@ -87,9 +87,9 @@ open class Renderer {
         _ = inFlightSemaphore.wait(timeout: DispatchTime.distantFuture)
     }
 
-    func registerInFlight(_ commandBuffer: MTLCommandBuffer) {
+    func commitFrameCommand(_ frameCommand: SatinFrameCommand) {
         inFlightSemaphoreWait += 1
-        commandBuffer.addCompletedHandler { [weak self] _ in
+        frameCommand.commit { [weak self] in
             self?.inFlightSemaphore.signal()
             self?.inFlightSemaphoreRelease -= 1
         }
@@ -100,11 +100,26 @@ open class Renderer {
         frameIndex += 1
 
         if let commandBuffer = commandQueue.makeCommandBuffer() {
-            registerInFlight(commandBuffer)
             return MetalFrameCommand(frameIndex: frameIndex, commandBuffer: commandBuffer)
         }
 
         return nil
+    }
+
+    internal func makeFrameCommand() -> SatinFrameCommand? {
+        waitForAvailableFrameSlot()
+        frameIndex += 1
+
+        if context.backend == .metal4 {
+            if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
+               let frameCommand = context.metal4Support?.makeFrameCommand(frameIndex: frameIndex)
+            {
+                return frameCommand
+            }
+        }
+
+        guard let commandBuffer = commandQueue.makeCommandBuffer() else { return nil }
+        return MetalFrameCommand(frameIndex: frameIndex, commandBuffer: commandBuffer)
     }
 
     open func preDraw() -> MTLCommandBuffer? {
@@ -140,7 +155,7 @@ open class Renderer {
     open func draw(renderPassDescriptor: MTLRenderPassDescriptor, commandBuffer: MTLCommandBuffer) {}
 
     open func postDraw(commandBuffer: MTLCommandBuffer) {
-        MetalFrameCommand(frameIndex: frameIndex, commandBuffer: commandBuffer).commit()
+        commitFrameCommand(MetalFrameCommand(frameIndex: frameIndex, commandBuffer: commandBuffer))
     }
 
     open func setup() {}

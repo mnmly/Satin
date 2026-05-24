@@ -10,6 +10,8 @@ import Metal
 internal protocol SatinFrameCommand {
     var backend: MetalBackend { get }
     var frameIndex: Int { get }
+    func commit()
+    func commit(onCompleted: (() -> Void)?)
 }
 
 internal final class MetalFrameCommand: SatinFrameCommand {
@@ -23,6 +25,15 @@ internal final class MetalFrameCommand: SatinFrameCommand {
     }
 
     func commit() {
+        commit(onCompleted: nil)
+    }
+
+    func commit(onCompleted: (() -> Void)?) {
+        if let onCompleted {
+            commandBuffer.addCompletedHandler { _ in
+                onCompleted()
+            }
+        }
         commandBuffer.commit()
     }
 }
@@ -34,6 +45,7 @@ internal final class Metal4FrameCommand: SatinFrameCommand {
     let commandQueue: any MTL4CommandQueue
     let commandBuffer: any MTL4CommandBuffer
     let commandAllocator: any MTL4CommandAllocator
+    private var isEncoding = false
 
     init(
         frameIndex: Int,
@@ -50,13 +62,29 @@ internal final class Metal4FrameCommand: SatinFrameCommand {
     func begin() {
         commandAllocator.reset()
         commandBuffer.beginCommandBuffer(allocator: commandAllocator)
+        isEncoding = true
     }
 
     func end() {
+        guard isEncoding else { return }
         commandBuffer.endCommandBuffer()
+        isEncoding = false
     }
 
     func commit() {
-        commandQueue.commit([commandBuffer])
+        commit(onCompleted: nil)
+    }
+
+    func commit(onCompleted: (() -> Void)?) {
+        end()
+        if let onCompleted {
+            let options = MTL4CommitOptions()
+            options.addFeedbackHandler { _ in
+                onCompleted()
+            }
+            commandQueue.commit([commandBuffer], options: options)
+        } else {
+            commandQueue.commit([commandBuffer])
+        }
     }
 }

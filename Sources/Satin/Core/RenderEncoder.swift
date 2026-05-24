@@ -1597,6 +1597,7 @@ open class RenderEncoder {
                 return failFrameCommandDraw("Metal 4 render command encoder could not be created.")
             }
             configureMetal4RenderEncoder(renderCommand.renderEncoder, viewports: viewports, viewMappings: viewMappings)
+            renderCommand.renderEncoder.endEncoding()
             return true
         }
 
@@ -1631,6 +1632,7 @@ open class RenderEncoder {
                 viewports: simdViewports,
                 phase: phase
             )
+            renderCommand.renderEncoder.endEncoding()
         }
 
         return true

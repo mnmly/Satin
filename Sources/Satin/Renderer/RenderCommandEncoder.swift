@@ -21,7 +21,9 @@ internal protocol SatinRenderCommandEncoder {
     func setFragmentBuffer(_ buffer: MTLBuffer, offset: Int, index: Int)
     func setVertexTexture(_ texture: MTLTexture?, index: Int)
     func setFragmentTexture(_ texture: MTLTexture?, index: Int)
+    func setFragmentTextures(_ textures: [MTLTexture?], range: Range<Int>)
     func setFragmentSamplerState(_ samplerState: MTLSamplerState?, index: Int)
+    func useResource(_ resource: MTLResource, usage: MTLResourceUsage, stages: MTLRenderStages)
     func drawPrimitives(type: MTLPrimitiveType, vertexStart: Int, vertexCount: Int, instanceCount: Int)
     func drawIndexedPrimitives(
         type: MTLPrimitiveType,
@@ -107,8 +109,16 @@ internal final class MetalRenderCommandEncoder: SatinRenderCommandEncoder {
         renderEncoder.setFragmentTexture(texture, index: index)
     }
 
+    func setFragmentTextures(_ textures: [MTLTexture?], range: Range<Int>) {
+        renderEncoder.setFragmentTextures(textures, range: range)
+    }
+
     func setFragmentSamplerState(_ samplerState: MTLSamplerState?, index: Int) {
         renderEncoder.setFragmentSamplerState(samplerState, index: index)
+    }
+
+    func useResource(_ resource: MTLResource, usage: MTLResourceUsage, stages: MTLRenderStages) {
+        renderEncoder.useResource(resource, usage: usage, stages: stages)
     }
 
     func drawPrimitives(type: MTLPrimitiveType, vertexStart: Int, vertexCount: Int, instanceCount: Int) {
@@ -252,10 +262,22 @@ internal final class Metal4RenderCommandEncoder: SatinRenderCommandEncoder {
         argumentTables.setFragmentTexture(texture, index: fragmentTextureIndex)
     }
 
+    func setFragmentTextures(_ textures: [MTLTexture?], range: Range<Int>) {
+        for (offset, texture) in textures.enumerated() {
+            let index = range.lowerBound + offset
+            guard range.contains(index), let fragmentTextureIndex = FragmentTextureIndex(rawValue: index) else {
+                continue
+            }
+            argumentTables.setFragmentTexture(texture, index: fragmentTextureIndex)
+        }
+    }
+
     func setFragmentSamplerState(_ samplerState: MTLSamplerState?, index: Int) {
         guard let fragmentSamplerIndex = FragmentSamplerIndex(rawValue: index) else { return }
         argumentTables.setFragmentSamplerState(samplerState, index: fragmentSamplerIndex)
     }
+
+    func useResource(_ resource: MTLResource, usage: MTLResourceUsage, stages: MTLRenderStages) {}
 
     func drawPrimitives(type: MTLPrimitiveType, vertexStart: Int, vertexCount: Int, instanceCount: Int) {
         renderEncoder.drawPrimitives(

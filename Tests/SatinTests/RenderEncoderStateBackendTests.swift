@@ -20,6 +20,10 @@ final class RenderEncoderStateBackendTests: XCTestCase {
         let samplerState = try XCTUnwrap(device.makeSamplerState(descriptor: samplerDescriptor))
         state.setFragmentSamplerState(samplerState, index: .Custom0)
 
+        let texture = try XCTUnwrap(makeTexture(device: device))
+        state.setFragmentTextures([texture], startIndex: .Projector0)
+        state.useFragmentResource(texture)
+
         let tessellationFactorBuffer = try XCTUnwrap(device.makeBuffer(length: 256))
         XCTAssertTrue(state.setTessellationFactorBuffer(tessellationFactorBuffer, offset: 0, instanceStride: 0))
 
@@ -48,6 +52,10 @@ final class RenderEncoderStateBackendTests: XCTestCase {
         XCTAssertFalse(state.supportsClassicRenderEncoder)
         XCTAssertFalse(state.supportsTessellation)
 
+        let texture = try XCTUnwrap(makeTexture(device: device))
+        state.setFragmentTextures([texture], startIndex: .Projector0)
+        state.useFragmentResource(texture)
+
         let tessellationFactorBuffer = try XCTUnwrap(device.makeBuffer(length: 256))
         XCTAssertFalse(state.setTessellationFactorBuffer(tessellationFactorBuffer, offset: 0, instanceStride: 0))
 
@@ -70,5 +78,16 @@ final class RenderEncoderStateBackendTests: XCTestCase {
         renderPassDescriptor.colorAttachments[0].loadAction = .clear
         renderPassDescriptor.colorAttachments[0].storeAction = .store
         return renderPassDescriptor
+    }
+
+    private func makeTexture(device: MTLDevice) -> MTLTexture? {
+        let textureDescriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm,
+            width: 1,
+            height: 1,
+            mipmapped: false
+        )
+        textureDescriptor.usage = [.shaderRead]
+        return device.makeTexture(descriptor: textureDescriptor)
     }
 }

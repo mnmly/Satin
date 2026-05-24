@@ -1995,43 +1995,43 @@ open class RenderEncoder {
 
         if !lightReceivers.isEmpty {
             if let lightBuffer = lightDataBuffer {
-                renderEncoder.setFragmentBuffer(
+                renderEncoderState.setFragmentBuffer(
                     lightBuffer.buffer,
                     offset: lightBuffer.offset,
-                    index: FragmentBufferIndex.Lighting.rawValue
+                    index: .Lighting
                 )
             }
         }
 
         if let projectorMatricesBuffer = projectorMatricesBuffer {
-            renderEncoder.setFragmentBuffer(
+            renderEncoderState.setFragmentBuffer(
                 projectorMatricesBuffer.buffer,
                 offset: projectorMatricesBuffer.offset,
-                index: FragmentBufferIndex.ProjectorMatrices.rawValue
+                index: .ProjectorMatrices
             )
         }
 
         if let projectorTransformsBuffer = projectorTransformsBuffer {
-            renderEncoder.setFragmentBuffer(
+            renderEncoderState.setFragmentBuffer(
                 projectorTransformsBuffer.buffer,
                 offset: projectorTransformsBuffer.offset,
-                index: FragmentBufferIndex.ProjectorTransforms.rawValue
+                index: .ProjectorTransforms
             )
         }
 
         if let directShadowDataBuffer = directShadowDataBuffer {
-            renderEncoder.setFragmentBuffer(
+            renderEncoderState.setFragmentBuffer(
                 directShadowDataBuffer.buffer,
                 offset: directShadowDataBuffer.offset,
-                index: FragmentBufferIndex.DirectShadows.rawValue
+                index: .DirectShadows
             )
         }
 
         if let directShadowMatricesBuffer = directShadowMatricesBuffer {
-            renderEncoder.setFragmentBuffer(
+            renderEncoderState.setFragmentBuffer(
                 directShadowMatricesBuffer.buffer,
                 offset: directShadowMatricesBuffer.offset,
-                index: FragmentBufferIndex.DirectShadowMatrices.rawValue
+                index: .DirectShadowMatrices
             )
         }
 
@@ -2039,43 +2039,43 @@ open class RenderEncoder {
         updateProjectorTextures()
 
         if !projectorTextures.isEmpty {
-            renderEncoder.setFragmentTextures(
+            renderEncoderState.setFragmentTextures(
                 projectorTextures,
-                range: FragmentTextureIndex.Projector0.rawValue..<(FragmentTextureIndex.Projector0.rawValue + projectorTextures.count)
+                startIndex: .Projector0
             )
         }
 
         if !directShadowTextures.isEmpty {
-            renderEncoder.setFragmentTextures(
+            renderEncoderState.setFragmentTextures(
                 directShadowTextures,
-                range: FragmentTextureIndex.DirectShadow0.rawValue..<(FragmentTextureIndex.DirectShadow0.rawValue + directShadowTextures.count)
+                startIndex: .DirectShadow0
             )
         }
         if let projectorMatricesBuffer = projectorMatricesBuffer {
-            renderEncoder.useResource(projectorMatricesBuffer.buffer, usage: .read, stages: .fragment)
+            renderEncoderState.useFragmentResource(projectorMatricesBuffer.buffer)
         }
 
         if let projectorTransformsBuffer = projectorTransformsBuffer {
-            renderEncoder.useResource(projectorTransformsBuffer.buffer, usage: .read, stages: .fragment)
+            renderEncoderState.useFragmentResource(projectorTransformsBuffer.buffer)
         }
 
         if let directShadowDataBuffer = directShadowDataBuffer {
-            renderEncoder.useResource(directShadowDataBuffer.buffer, usage: .read, stages: .fragment)
+            renderEncoderState.useFragmentResource(directShadowDataBuffer.buffer)
         }
 
         if let directShadowMatricesBuffer = directShadowMatricesBuffer {
-            renderEncoder.useResource(directShadowMatricesBuffer.buffer, usage: .read, stages: .fragment)
+            renderEncoderState.useFragmentResource(directShadowMatricesBuffer.buffer)
         }
 
         for projectorTexture in projectorTextures {
             if let projectorTexture {
-                renderEncoder.useResource(projectorTexture, usage: .read, stages: .fragment)
+                renderEncoderState.useFragmentResource(projectorTexture)
             }
         }
 
         for directShadowTexture in directShadowTextures {
             if let directShadowTexture {
-                renderEncoder.useResource(directShadowTexture, usage: .read, stages: .fragment)
+                renderEncoderState.useFragmentResource(directShadowTexture)
             }
         }
 
@@ -2146,7 +2146,10 @@ open class RenderEncoder {
             )
         }
 
-        renderable.preDraw?(renderEncoder)
+        renderable.preDrawState?(renderEncoderState)
+        if renderEncoderState.supportsClassicRenderEncoder {
+            renderable.preDraw?(renderEncoder)
+        }
 
         renderEncoderState.windingOrder = renderable.windingOrder
         renderEncoderState.triangleFillMode = renderable.triangleFillMode

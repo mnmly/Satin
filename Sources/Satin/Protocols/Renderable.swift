@@ -83,6 +83,7 @@ open class Renderable : Object {
     open var materials: [Material] = []
 
     open var preDraw: ((_ renderEncoder: MTLRenderCommandEncoder) -> Void)? = nil
+    open var preDrawState: ((_ renderEncoderState: RenderEncoderState) -> Void)? = nil
 
     open func isDrawable(renderContext: Context, shadow: Bool) -> Bool {
         fatalError("Subclasses must implement this method")

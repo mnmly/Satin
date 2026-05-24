@@ -208,6 +208,18 @@ public final class RenderEncoderState {
         }
     }
 
+    public func setFragmentTextures(_ textures: [MTLTexture?], startIndex: FragmentTextureIndex) {
+        guard !textures.isEmpty else { return }
+        commands.setFragmentTextures(
+            textures,
+            range: startIndex.rawValue..<(startIndex.rawValue + textures.count)
+        )
+        for (offset, texture) in textures.enumerated() {
+            guard let index = FragmentTextureIndex(rawValue: startIndex.rawValue + offset) else { continue }
+            fragmentTextures[index] = texture
+        }
+    }
+
     public func setFragmentSamplerState(_ samplerState: MTLSamplerState?, index: FragmentSamplerIndex) {
         if let existingSamplerState = fragmentSamplerStates[index], existingSamplerState === samplerState {
             return
@@ -216,6 +228,10 @@ public final class RenderEncoderState {
             commands.setFragmentSamplerState(samplerState, index: index.rawValue)
             fragmentSamplerStates[index] = samplerState
         }
+    }
+
+    public func useFragmentResource(_ resource: MTLResource) {
+        commands.useResource(resource, usage: .read, stages: .fragment)
     }
 
     public func drawPrimitives(type: MTLPrimitiveType, vertexStart: Int, vertexCount: Int, instanceCount: Int) {

@@ -1592,9 +1592,10 @@ open class RenderEncoder {
     ) -> Bool {
         let routeEntries = routePassEntries(route: route)
         if routeEntries.isEmpty {
-            guard clearWhenEmpty,
-                  let renderCommand = makeMetal4RenderCommand(renderPassDescriptor: renderPassDescriptor, frameCommand: frameCommand)
-            else { return false }
+            guard clearWhenEmpty else { return false }
+            guard let renderCommand = makeMetal4RenderCommand(renderPassDescriptor: renderPassDescriptor, frameCommand: frameCommand) else {
+                return failFrameCommandDraw("Metal 4 render command encoder could not be created.")
+            }
             configureMetal4RenderEncoder(renderCommand.renderEncoder, viewports: viewports, viewMappings: viewMappings)
             return true
         }
@@ -1606,9 +1607,13 @@ open class RenderEncoder {
                 renderPassDescriptor.stencilAttachment.loadAction = .load
             }
 
-            guard let renderCommand = makeMetal4RenderCommand(renderPassDescriptor: renderPassDescriptor, frameCommand: frameCommand),
-                  let argumentTables = Metal4ArgumentTables(device: context.device)
-            else { continue }
+            guard let renderCommand = makeMetal4RenderCommand(renderPassDescriptor: renderPassDescriptor, frameCommand: frameCommand) else {
+                return failFrameCommandDraw("Metal 4 render command encoder could not be created.")
+            }
+
+            guard let argumentTables = Metal4ArgumentTables(device: context.device) else {
+                return failFrameCommandDraw("Metal 4 argument tables could not be created.")
+            }
 
             configureMetal4RenderEncoder(renderCommand.renderEncoder, viewports: viewports, viewMappings: viewMappings)
             argumentTables.bind(to: renderCommand.renderEncoder)

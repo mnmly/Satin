@@ -131,6 +131,21 @@ class ARDepthUpscaler {
         return upscaledDepthTexture
     }
 
+    func update(
+        frameCommand: any SatinFrameCommand,
+        yTexture: MTLTexture,
+        cbcrTexture: MTLTexture,
+        depthTexture: MTLTexture
+    ) -> MTLTexture? {
+        guard let frameCommand = frameCommand as? MetalFrameCommand else { return nil }
+        return update(
+            commandBuffer: frameCommand.commandBuffer,
+            yTexture: yTexture,
+            cbcrTexture: cbcrTexture,
+            depthTexture: depthTexture
+        )
+    }
+
     func createTexture(
         device: MTLDevice,
         label: String,

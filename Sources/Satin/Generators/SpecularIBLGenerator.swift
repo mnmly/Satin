@@ -82,23 +82,21 @@ public final class SpecularIBLGenerator {
             computeEncoder.setBytes(&faceLevelSizeResolution, length: MemoryLayout<simd_uint4>.size, index: ComputeBufferIndex.Custom0.rawValue)
         }
 
-        if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
-            compute.preComputeMetal4 = { (argumentTable: Metal4ComputeArgumentTable, iteration: Int) in
-                guard let faceLevelSizeResolutionBuffer else { return }
+        compute.preComputeBinding = { binding, iteration in
+            guard binding.backend == .metal4, let faceLevelSizeResolutionBuffer else { return }
 
-                let face = UInt32(iteration % 6)
-                let level = UInt32(iteration / 6)
-                let size = UInt32(Float(width) / pow(2.0, Float(level)))
-                let resolution = UInt32(resolution)
-                var faceLevelSizeResolution = simd_make_uint4(face, level, size, resolution)
+            let face = UInt32(iteration % 6)
+            let level = UInt32(iteration / 6)
+            let size = UInt32(Float(width) / pow(2.0, Float(level)))
+            let resolution = UInt32(resolution)
+            var faceLevelSizeResolution = simd_make_uint4(face, level, size, resolution)
 
-                withUnsafeBytes(of: &faceLevelSizeResolution) { bytes in
-                    if let baseAddress = bytes.baseAddress {
-                        faceLevelSizeResolutionBuffer.contents().copyMemory(from: baseAddress, byteCount: bytes.count)
-                    }
+            withUnsafeBytes(of: &faceLevelSizeResolution) { bytes in
+                if let baseAddress = bytes.baseAddress {
+                    faceLevelSizeResolutionBuffer.contents().copyMemory(from: baseAddress, byteCount: bytes.count)
                 }
-                argumentTable.setBuffer(faceLevelSizeResolutionBuffer, offset: 0, index: ComputeBufferIndex.Custom0)
             }
+            binding.setBuffer(faceLevelSizeResolutionBuffer, offset: 0, index: ComputeBufferIndex.Custom0)
         }
 
         destinationTexture.label = "Specular IBL"

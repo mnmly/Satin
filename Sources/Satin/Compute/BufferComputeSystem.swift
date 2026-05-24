@@ -129,13 +129,14 @@ open class BufferComputeSystem: ComputeSystem {
     }
 
     open func bind(_ computeEncoder: MTLComputeCommandEncoder) -> Int {
-        bindBuffers(computeEncoder, ComputeBufferIndex.Custom0.rawValue)
+        bind(MetalComputeArgumentBinding(computeEncoder))
     }
 
     private func encode(_ computeEncoder: MTLComputeCommandEncoder, iterations: Int = 1) {
         bindUniforms(computeEncoder)
         bindBuffers(computeEncoder)
         bindTextures(computeEncoder)
+        let binding = MetalComputeArgumentBinding(computeEncoder)
 
         if _reset, let pipeline = resetPipeline {
             computeEncoder.setComputePipelineState(pipeline)
@@ -143,6 +144,7 @@ open class BufferComputeSystem: ComputeSystem {
             for _ in 0 ..< feedbackCount {
                 var offset = bind(computeEncoder)
                 preCompute?(computeEncoder, &offset, 0)
+                preComputeBinding?(binding, &offset, 0)
                 dispatch(computeEncoder: computeEncoder, pipeline: pipeline, iteration: 0)
                 swapSrdDstIndex()
             }
@@ -153,15 +155,15 @@ open class BufferComputeSystem: ComputeSystem {
             for iteration in 0 ..< iterations {
                 var offset = bind(computeEncoder)
                 preCompute?(computeEncoder, &offset, iteration)
+                preComputeBinding?(binding, &offset, iteration)
                 dispatch(computeEncoder: computeEncoder, pipeline: pipeline, iteration: iteration)
                 swapSrdDstIndex()
             }
         }
     }
 
-    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
-    func bind(_ argumentTable: Metal4ComputeArgumentTable) -> Int {
-        bindBuffers(argumentTable, ComputeBufferIndex.Custom0.rawValue)
+    open func bind(_ binding: any ComputeArgumentBinding) -> Int {
+        bindBuffers(binding, ComputeBufferIndex.Custom0.rawValue)
     }
 
     @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
@@ -169,15 +171,14 @@ open class BufferComputeSystem: ComputeSystem {
         bindUniforms(argumentTable)
         bindBuffers(argumentTable)
         bindTextures(argumentTable)
+        let binding = Metal4ComputeArgumentBinding(argumentTable)
 
         if _reset, let pipeline = resetPipeline {
             computeEncoder.setComputePipelineState(pipeline)
 
             for _ in 0 ..< feedbackCount {
-                var offset = bind(argumentTable)
-                if let preComputeMetal4 = preComputeMetal4 as? (Metal4ComputeArgumentTable, inout Int, Int) -> Void {
-                    preComputeMetal4(argumentTable, &offset, 0)
-                }
+                var offset = bind(binding)
+                preComputeBinding?(binding, &offset, 0)
                 dispatch(metal4ComputeEncoder: computeEncoder, pipeline: pipeline, iteration: 0)
                 swapSrdDstIndex()
             }
@@ -186,10 +187,8 @@ open class BufferComputeSystem: ComputeSystem {
         } else if let pipeline = updatePipeline {
             computeEncoder.setComputePipelineState(pipeline)
             for iteration in 0 ..< iterations {
-                var offset = bind(argumentTable)
-                if let preComputeMetal4 = preComputeMetal4 as? (Metal4ComputeArgumentTable, inout Int, Int) -> Void {
-                    preComputeMetal4(argumentTable, &offset, iteration)
-                }
+                var offset = bind(binding)
+                preComputeBinding?(binding, &offset, iteration)
                 dispatch(metal4ComputeEncoder: computeEncoder, pipeline: pipeline, iteration: iteration)
                 swapSrdDstIndex()
             }
@@ -292,24 +291,23 @@ open class BufferComputeSystem: ComputeSystem {
         return indexOffset
     }
 
-    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
-    private func bindBuffers(_ argumentTable: Metal4ComputeArgumentTable, _ offset: Int) -> Int {
+    private func bindBuffers(_ binding: any ComputeArgumentBinding, _ offset: Int) -> Int {
         var indexOffset = offset
         if feedback {
             for key in bufferOrder {
                 if let buffers = bufferMap[key] {
                     let inBuffer = buffers[srcIndex]
                     let outBuffer = buffers[dstIndex]
-                    argumentTable.setBuffer(inBuffer, offset: 0, index: indexOffset)
+                    binding.setBuffer(inBuffer, offset: 0, index: indexOffset)
                     indexOffset += 1
-                    argumentTable.setBuffer(outBuffer, offset: 0, index: indexOffset)
+                    binding.setBuffer(outBuffer, offset: 0, index: indexOffset)
                     indexOffset += 1
                 }
             }
         } else {
             for key in bufferOrder {
                 if let buffers = bufferMap[key] {
-                    argumentTable.setBuffer(buffers[srcIndex], offset: 0, index: indexOffset)
+                    binding.setBuffer(buffers[srcIndex], offset: 0, index: indexOffset)
                     indexOffset += 1
                 }
             }

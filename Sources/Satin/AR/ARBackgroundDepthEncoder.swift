@@ -168,6 +168,15 @@ public class ARBackgroundDepthEncoder: ARBackgroundEncoder {
 
     override public func draw(
         renderPassDescriptor: MTLRenderPassDescriptor,
+        frameCommand: any SatinFrameCommand
+    ) -> Bool {
+        guard let frameCommand = frameCommand as? MetalFrameCommand else { return false }
+        draw(renderPassDescriptor: renderPassDescriptor, commandBuffer: frameCommand.commandBuffer)
+        return true
+    }
+
+    override public func draw(
+        renderPassDescriptor: MTLRenderPassDescriptor,
         commandBuffer: MTLCommandBuffer,
         renderTarget: MTLTexture
     ) {
@@ -180,6 +189,20 @@ public class ARBackgroundDepthEncoder: ARBackgroundEncoder {
             camera: depthCamera,
             renderTarget: renderTarget
         )
+    }
+
+    override public func draw(
+        renderPassDescriptor: MTLRenderPassDescriptor,
+        frameCommand: any SatinFrameCommand,
+        renderTarget: MTLTexture
+    ) -> Bool {
+        guard let frameCommand = frameCommand as? MetalFrameCommand else { return false }
+        draw(
+            renderPassDescriptor: renderPassDescriptor,
+            commandBuffer: frameCommand.commandBuffer,
+            renderTarget: renderTarget
+        )
+        return true
     }
 
     override public func resize(size: (width: Float, height: Float), scaleFactor: Float) {

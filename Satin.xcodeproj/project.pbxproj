@@ -96,6 +96,7 @@
 		E101A8B32C070E8E0055FABA /* BufferComputeSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66D7DD652C06A24B00B5A6C8 /* BufferComputeSystem.swift */; };
 		E101A8B42C070E8E0055FABA /* ComputeSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66D7DD662C06A24B00B5A6C8 /* ComputeSystem.swift */; };
 		E101A8B52C070E8E0055FABA /* TextureComputeSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66D7DD672C06A24B00B5A6C8 /* TextureComputeSystem.swift */; };
+		99D845062FC31B17002590CB /* ComputeArgumentBinding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99D844F72FC31B17002590CB /* ComputeArgumentBinding.swift */; };
 		E101A8B62C070E8E0055FABA /* ComputeConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66D7DD692C06A24B00B5A6C8 /* ComputeConstants.swift */; };
 		E101A8B72C070E8E0055FABA /* FragmentConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66D7DD6A2C06A24B00B5A6C8 /* FragmentConstants.swift */; };
 		E101A8B82C070E8E0055FABA /* MeshConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66D7DD6B2C06A24B00B5A6C8 /* MeshConstants.swift */; };
@@ -356,6 +357,7 @@
 		66D7DD652C06A24B00B5A6C8 /* BufferComputeSystem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BufferComputeSystem.swift; sourceTree = "<group>"; };
 		66D7DD662C06A24B00B5A6C8 /* ComputeSystem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ComputeSystem.swift; sourceTree = "<group>"; };
 		66D7DD672C06A24B00B5A6C8 /* TextureComputeSystem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TextureComputeSystem.swift; sourceTree = "<group>"; };
+		99D844F72FC31B17002590CB /* ComputeArgumentBinding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComputeArgumentBinding.swift; sourceTree = "<group>"; };
 		66D7DD692C06A24B00B5A6C8 /* ComputeConstants.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ComputeConstants.swift; sourceTree = "<group>"; };
 		66D7DD6A2C06A24B00B5A6C8 /* FragmentConstants.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FragmentConstants.swift; sourceTree = "<group>"; };
 		66D7DD6B2C06A24B00B5A6C8 /* MeshConstants.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MeshConstants.swift; sourceTree = "<group>"; };
@@ -726,6 +728,7 @@
 				E10D918C2CBF60A600107EE9 /* TessellationProcessor.swift */,
 				66D7DD642C06A24B00B5A6C8 /* Utilities */,
 				66D7DD652C06A24B00B5A6C8 /* BufferComputeSystem.swift */,
+				99D844F72FC31B17002590CB /* ComputeArgumentBinding.swift */,
 				66D7DD662C06A24B00B5A6C8 /* ComputeSystem.swift */,
 				66D7DD672C06A24B00B5A6C8 /* TextureComputeSystem.swift */,
 				E14638652C8CB4C4005E36E9 /* TextureComputeProcessor.swift */,
@@ -1459,6 +1462,7 @@
 				1B7FEE222F9944B00075DA16 /* SsaoCompositeMaterial.swift in Sources */,
 				E101A8B22C070E8E0055FABA /* ComputeShaderPipelineCache.swift in Sources */,
 				E101A8B32C070E8E0055FABA /* BufferComputeSystem.swift in Sources */,
+				99D845062FC31B17002590CB /* ComputeArgumentBinding.swift in Sources */,
 				E101A8B42C070E8E0055FABA /* ComputeSystem.swift in Sources */,
 				E101A8B52C070E8E0055FABA /* TextureComputeSystem.swift in Sources */,
 				E101A8B62C070E8E0055FABA /* ComputeConstants.swift in Sources */,

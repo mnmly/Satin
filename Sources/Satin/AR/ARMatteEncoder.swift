@@ -87,6 +87,13 @@ public class ARMatteEncoder {
         )
     }
 
+    @discardableResult
+    public func encode(frameCommand: any SatinFrameCommand) -> Bool {
+        guard let frameCommand = frameCommand as? MetalFrameCommand else { return false }
+        encode(commandBuffer: frameCommand.commandBuffer)
+        return true
+    }
+
     private func updateGeometry(_ frame: ARFrame) {
         guard let interfaceOrientation = UIWindow.keyWindow?.windowScene?.interfaceOrientation else { return }
 

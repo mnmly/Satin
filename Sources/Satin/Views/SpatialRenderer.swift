@@ -50,7 +50,7 @@ open class SpatialRenderer: Renderer, CompositorLayerConfiguration {
     open override func makeDefaultContext() -> Context {
         Context(
             device: device,
-            backend: context.requestedBackend,
+            backend: .metal3,
             sampleCount: sampleCount,
             colorPixelFormat: colorPixelFormat,
             depthPixelFormat: depthPixelFormat,

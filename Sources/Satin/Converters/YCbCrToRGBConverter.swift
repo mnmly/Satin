@@ -28,11 +28,10 @@ public final class YCbCrToRGBConverter {
             return index + 2
         }
 
-        @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
-        override func bind(_ argumentTable: Metal4ComputeArgumentTable, iteration: Int) -> Int {
-            let index = super.bind(argumentTable, iteration: iteration)
-            argumentTable.setTexture(yTexture, index: index)
-            argumentTable.setTexture(cbcrTexture, index: index + 1)
+        override func bind(_ binding: any ComputeArgumentBinding, iteration: Int) -> Int {
+            let index = super.bind(binding, iteration: iteration)
+            binding.setTexture(yTexture, index: index)
+            binding.setTexture(cbcrTexture, index: index + 1)
             return index + 2
         }
     }

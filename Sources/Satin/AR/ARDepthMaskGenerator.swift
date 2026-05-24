@@ -33,12 +33,11 @@ public class ARDepthMaskGenerator {
             return index
         }
 
-        @available(iOS 26.0, *)
-        override func bind(_ argumentTable: Metal4ComputeArgumentTable, iteration: Int) -> Int {
-            var index = super.bind(argumentTable, iteration: iteration)
-            argumentTable.setTexture(realDepthTexture, index: index)
+        override func bind(_ binding: any ComputeArgumentBinding, iteration: Int) -> Int {
+            var index = super.bind(binding, iteration: iteration)
+            binding.setTexture(realDepthTexture, index: index)
             index += 1
-            argumentTable.setTexture(virtualDepthTexture, index: index)
+            binding.setTexture(virtualDepthTexture, index: index)
             index += 1
             return index
         }

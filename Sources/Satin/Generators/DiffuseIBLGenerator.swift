@@ -51,17 +51,15 @@ public final class DiffuseIBLGenerator {
             computeEncoder.setBytes(&face, length: MemoryLayout<UInt32>.size, index: ComputeBufferIndex.Custom0.rawValue)
         }
 
-        if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
-            compute.preComputeMetal4 = { (argumentTable: Metal4ComputeArgumentTable, iteration: Int) in
-                guard let faceBuffer else { return }
-                var face = UInt32(iteration)
-                withUnsafeBytes(of: &face) { bytes in
-                    if let baseAddress = bytes.baseAddress {
-                        faceBuffer.contents().copyMemory(from: baseAddress, byteCount: bytes.count)
-                    }
+        compute.preComputeBinding = { binding, iteration in
+            guard binding.backend == .metal4, let faceBuffer else { return }
+            var face = UInt32(iteration)
+            withUnsafeBytes(of: &face) { bytes in
+                if let baseAddress = bytes.baseAddress {
+                    faceBuffer.contents().copyMemory(from: baseAddress, byteCount: bytes.count)
                 }
-                argumentTable.setBuffer(faceBuffer, offset: 0, index: ComputeBufferIndex.Custom0)
             }
+            binding.setBuffer(faceBuffer, offset: 0, index: ComputeBufferIndex.Custom0)
         }
 
         destinationTexture.label = "Diffuse IBL"

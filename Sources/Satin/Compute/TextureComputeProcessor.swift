@@ -97,10 +97,12 @@ open class TextureComputeProcessor: ComputeProcessor {
         bindUniforms(computeEncoder)
         bindBuffers(computeEncoder)
         bindTextures(computeEncoder)
+        let binding = MetalComputeArgumentBinding(computeEncoder)
 
         if _reset, let pipeline = resetPipeline {
             computeEncoder.setComputePipelineState(pipeline)
             preCompute?(computeEncoder, 0)
+            preComputeBinding?(binding, 0)
             dispatch(
                 computeEncoder: computeEncoder,
                 pipeline: pipeline,
@@ -113,6 +115,7 @@ open class TextureComputeProcessor: ComputeProcessor {
             computeEncoder.setComputePipelineState(pipeline)
             for iteration in 0 ..< iterations {
                 preCompute?(computeEncoder, iteration)
+                preComputeBinding?(binding, iteration)
                 dispatch(
                     computeEncoder: computeEncoder,
                     pipeline: pipeline,
@@ -127,12 +130,11 @@ open class TextureComputeProcessor: ComputeProcessor {
         bindUniforms(argumentTable)
         bindBuffers(argumentTable)
         bindTextures(argumentTable)
+        let binding = Metal4ComputeArgumentBinding(argumentTable)
 
         if _reset, let pipeline = resetPipeline {
             computeEncoder.setComputePipelineState(pipeline)
-            if let preComputeMetal4 = preComputeMetal4 as? (Metal4ComputeArgumentTable, Int) -> Void {
-                preComputeMetal4(argumentTable, 0)
-            }
+            preComputeBinding?(binding, 0)
             dispatch(
                 metal4ComputeEncoder: computeEncoder,
                 pipeline: pipeline,
@@ -144,9 +146,7 @@ open class TextureComputeProcessor: ComputeProcessor {
         if let pipeline = updatePipeline {
             computeEncoder.setComputePipelineState(pipeline)
             for iteration in 0 ..< iterations {
-                if let preComputeMetal4 = preComputeMetal4 as? (Metal4ComputeArgumentTable, Int) -> Void {
-                    preComputeMetal4(argumentTable, iteration)
-                }
+                preComputeBinding?(binding, iteration)
                 dispatch(
                     metal4ComputeEncoder: computeEncoder,
                     pipeline: pipeline,

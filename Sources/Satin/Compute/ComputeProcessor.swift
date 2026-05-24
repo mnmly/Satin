@@ -32,7 +32,7 @@ open class ComputeProcessor: ComputeShaderDelegate {
     public weak var delegate: ComputeProcessorDelegate?
 
     public var preCompute: ((_ computeEncoder: MTLComputeCommandEncoder, _ iteration: Int) -> Void)?
-    var preComputeMetal4: Any?
+    public var preComputeBinding: ((_ binding: any ComputeArgumentBinding, _ iteration: Int) -> Void)?
 
     public private(set) var computeUniformBuffers: [ComputeBufferIndex: UniformBuffer] = [:]
     public private(set) var computeStructBuffers: [ComputeBufferIndex: BindableBuffer] = [:]
@@ -303,36 +303,48 @@ open class ComputeProcessor: ComputeShaderDelegate {
         }
     }
 
-    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
-    func bindUniforms(_ argumentTable: Metal4ComputeArgumentTable) {
+    open func bindUniforms(_ binding: any ComputeArgumentBinding) {
         guard let uniforms, let shader, shader.resetWantsUniforms || shader.updateWantsUniforms else { return }
-        argumentTable.setBuffer(uniforms.buffer, offset: uniforms.offset, index: .Uniforms)
+        binding.setBuffer(uniforms.buffer, offset: uniforms.offset, index: .Uniforms)
     }
 
-    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
-    func bindBuffers(_ argumentTable: Metal4ComputeArgumentTable) {
+    func bindBuffers(_ binding: any ComputeArgumentBinding) {
         guard let shader else { return }
 
         for index in shader.bufferBindingIsUsed {
             if let uniformBuffer = computeUniformBuffers[index] {
-                argumentTable.setBuffer(uniformBuffer.buffer, offset: uniformBuffer.offset, index: index)
+                binding.setBuffer(uniformBuffer.buffer, offset: uniformBuffer.offset, index: index)
             } else if let structBuffer = computeStructBuffers[index] {
-                argumentTable.setBuffer(structBuffer.buffer, offset: structBuffer.offset, index: index)
+                binding.setBuffer(structBuffer.buffer, offset: structBuffer.offset, index: index)
             } else if let buffer = computeBuffers[index] {
-                argumentTable.setBuffer(buffer, offset: 0, index: index)
+                binding.setBuffer(buffer, offset: 0, index: index)
+            }
+        }
+    }
+
+    func bindTextures(_ binding: any ComputeArgumentBinding) {
+        guard let shader else { return }
+
+        for index in shader.textureBindingIsUsed {
+            if let texture = computeTextures[index] {
+                binding.setTexture(texture, index: index)
             }
         }
     }
 
     @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
-    func bindTextures(_ argumentTable: Metal4ComputeArgumentTable) {
-        guard let shader else { return }
+    func bindUniforms(_ argumentTable: Metal4ComputeArgumentTable) {
+        bindUniforms(Metal4ComputeArgumentBinding(argumentTable))
+    }
 
-        for index in shader.textureBindingIsUsed {
-            if let texture = computeTextures[index] {
-                argumentTable.setTexture(texture, index: index)
-            }
-        }
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    func bindBuffers(_ argumentTable: Metal4ComputeArgumentTable) {
+        bindBuffers(Metal4ComputeArgumentBinding(argumentTable))
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    func bindTextures(_ argumentTable: Metal4ComputeArgumentTable) {
+        bindTextures(Metal4ComputeArgumentBinding(argumentTable))
     }
 
     // MARK: - Count / Size

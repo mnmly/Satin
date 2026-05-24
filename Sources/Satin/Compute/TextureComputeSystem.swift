@@ -193,13 +193,14 @@ open class TextureComputeSystem: ComputeSystem {
     // MARK: - Binding & Encoding
 
     open func bind(computeEncoder: MTLComputeCommandEncoder, iteration: Int) -> Int {
-        bindTextures(computeEncoder, ComputeTextureIndex.Custom0.rawValue)
+        bind(MetalComputeArgumentBinding(computeEncoder), iteration: iteration)
     }
 
     private func encode(_ computeEncoder: MTLComputeCommandEncoder, iterations: Int = 1) {
         bindUniforms(computeEncoder)
         bindBuffers(computeEncoder)
         bindTextures(computeEncoder)
+        let binding = MetalComputeArgumentBinding(computeEncoder)
 
         if _reset, let pipeline = resetPipeline {
             computeEncoder.setComputePipelineState(pipeline)
@@ -207,6 +208,7 @@ open class TextureComputeSystem: ComputeSystem {
             for _ in 0 ..< feedbackCount {
                 var offset = bind(computeEncoder: computeEncoder, iteration: 0)
                 preCompute?(computeEncoder, &offset, 0)
+                preComputeBinding?(binding, &offset, 0)
                 dispatch(computeEncoder: computeEncoder, pipeline: pipeline, iteration: 0)
                 swapSrdDstIndex()
             }
@@ -219,6 +221,7 @@ open class TextureComputeSystem: ComputeSystem {
             for iteration in 0 ..< iterations {
                 var offset = bind(computeEncoder: computeEncoder, iteration: iteration)
                 preCompute?(computeEncoder, &offset, iteration)
+                preComputeBinding?(binding, &offset, iteration)
                 dispatch(computeEncoder: computeEncoder, pipeline: pipeline, iteration: iteration)
                 swapSrdDstIndex()
             }
@@ -230,15 +233,14 @@ open class TextureComputeSystem: ComputeSystem {
         bindUniforms(argumentTable)
         bindBuffers(argumentTable)
         bindTextures(argumentTable)
+        let binding = Metal4ComputeArgumentBinding(argumentTable)
 
         if _reset, let pipeline = resetPipeline {
             computeEncoder.setComputePipelineState(pipeline)
 
             for _ in 0 ..< feedbackCount {
-                var offset = bind(argumentTable, iteration: 0)
-                if let preComputeMetal4 = preComputeMetal4 as? (Metal4ComputeArgumentTable, inout Int, Int) -> Void {
-                    preComputeMetal4(argumentTable, &offset, 0)
-                }
+                var offset = bind(binding, iteration: 0)
+                preComputeBinding?(binding, &offset, 0)
                 dispatch(metal4ComputeEncoder: computeEncoder, pipeline: pipeline, iteration: 0)
                 swapSrdDstIndex()
             }
@@ -249,10 +251,8 @@ open class TextureComputeSystem: ComputeSystem {
         if let pipeline = updatePipeline {
             computeEncoder.setComputePipelineState(pipeline)
             for iteration in 0 ..< iterations {
-                var offset = bind(argumentTable, iteration: iteration)
-                if let preComputeMetal4 = preComputeMetal4 as? (Metal4ComputeArgumentTable, inout Int, Int) -> Void {
-                    preComputeMetal4(argumentTable, &offset, iteration)
-                }
+                var offset = bind(binding, iteration: iteration)
+                preComputeBinding?(binding, &offset, iteration)
                 dispatch(metal4ComputeEncoder: computeEncoder, pipeline: pipeline, iteration: iteration)
                 swapSrdDstIndex()
             }
@@ -283,28 +283,26 @@ open class TextureComputeSystem: ComputeSystem {
         return index
     }
 
-    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
-    func bind(_ argumentTable: Metal4ComputeArgumentTable, iteration: Int) -> Int {
-        bindTextures(argumentTable, ComputeTextureIndex.Custom0.rawValue)
+    open func bind(_ binding: any ComputeArgumentBinding, iteration: Int) -> Int {
+        bindTextures(binding, ComputeTextureIndex.Custom0.rawValue)
     }
 
-    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
-    private func bindTextures(_ argumentTable: Metal4ComputeArgumentTable, _ offset: Int) -> Int {
+    private func bindTextures(_ binding: any ComputeArgumentBinding, _ offset: Int) -> Int {
         var index = offset
         var textureIndex = 0
 
         if feedback {
             for _ in textureDescriptors {
-                argumentTable.setTexture(textures[textureIndex + srcIndex], index: index)
+                binding.setTexture(textures[textureIndex + srcIndex], index: index)
                 index += 1
-                argumentTable.setTexture(textures[textureIndex + dstIndex], index: index)
+                binding.setTexture(textures[textureIndex + dstIndex], index: index)
                 index += 1
                 textureIndex += 2
             }
         }
         else {
             for _ in textureDescriptors {
-                argumentTable.setTexture(textures[textureIndex], index: index)
+                binding.setTexture(textures[textureIndex], index: index)
                 textureIndex += 1
                 index += 1
             }

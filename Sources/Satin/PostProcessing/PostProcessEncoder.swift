@@ -81,10 +81,32 @@ open class PostProcessEncoder {
         )
     }
 
+    @discardableResult
+    open func draw(renderPassDescriptor: MTLRenderPassDescriptor, frameCommand: any SatinFrameCommand, renderTarget: MTLTexture) -> Bool {
+        renderer.draw(
+            renderPassDescriptor: renderPassDescriptor,
+            frameCommand: frameCommand,
+            scene: scene,
+            cameras: [camera],
+            viewports: [renderer.viewport],
+            renderTarget: renderTarget
+        )
+    }
+
     open func draw(renderPassDescriptor: MTLRenderPassDescriptor, commandBuffer: MTLCommandBuffer) {
         renderer.draw(
             renderPassDescriptor: renderPassDescriptor,
             commandBuffer: commandBuffer,
+            scene: scene,
+            camera: camera
+        )
+    }
+
+    @discardableResult
+    open func draw(renderPassDescriptor: MTLRenderPassDescriptor, frameCommand: any SatinFrameCommand) -> Bool {
+        renderer.draw(
+            renderPassDescriptor: renderPassDescriptor,
+            frameCommand: frameCommand,
             scene: scene,
             camera: camera
         )
@@ -102,10 +124,35 @@ open class PostProcessEncoder {
         )
     }
 
+    @discardableResult
+    open func draw(renderPassDescriptor: MTLRenderPassDescriptor, frameCommand: any SatinFrameCommand, viewports: [MTLViewport], viewMappings: [MTLVertexAmplificationViewMapping] = [], renderTarget: MTLTexture) -> Bool {
+        renderer.draw(
+            renderPassDescriptor: renderPassDescriptor,
+            frameCommand: frameCommand,
+            scene: scene,
+            cameras: [camera, camera],
+            viewports: viewports,
+            viewMappings: viewMappings,
+            renderTarget: renderTarget
+        )
+    }
+
     open func draw(renderPassDescriptor: MTLRenderPassDescriptor, commandBuffer: MTLCommandBuffer, viewports: [MTLViewport], viewMappings: [MTLVertexAmplificationViewMapping] = []) {
         renderer.draw(
             renderPassDescriptor: renderPassDescriptor,
             commandBuffer: commandBuffer,
+            scene: scene,
+            cameras: [camera, camera],
+            viewports: viewports,
+            viewMappings: viewMappings
+        )
+    }
+
+    @discardableResult
+    open func draw(renderPassDescriptor: MTLRenderPassDescriptor, frameCommand: any SatinFrameCommand, viewports: [MTLViewport], viewMappings: [MTLVertexAmplificationViewMapping] = []) -> Bool {
+        renderer.draw(
+            renderPassDescriptor: renderPassDescriptor,
+            frameCommand: frameCommand,
             scene: scene,
             cameras: [camera, camera],
             viewports: viewports,

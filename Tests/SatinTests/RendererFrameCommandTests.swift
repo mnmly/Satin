@@ -346,6 +346,41 @@ final class RendererFrameCommandTests: XCTestCase {
         renderer.commitFrameCommand(frameCommand)
     }
 
+    func testMetal4FrameCommandDrawSupportsPostProcessEncoder() throws {
+        guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) else {
+            throw XCTSkip("Metal 4 requires OS 26 or newer.")
+        }
+
+        let device = try XCTUnwrap(makeDevice())
+        let context = Context(
+            device: device,
+            backend: .metal4,
+            sampleCount: 1,
+            colorPixelFormat: .bgra8Unorm,
+            depthPixelFormat: .depth32Float
+        )
+        guard context.backend == .metal4 else {
+            throw XCTSkip("Metal 4 command queues are not available on this device.")
+        }
+
+        let renderer = TestRenderer(context: context)
+        let frameCommand = try XCTUnwrap(renderer.makeFrameCommand() as? Metal4FrameCommand)
+        let postProcessor = PostProcessEncoder(
+            context: context,
+            material: BasicColorMaterial(context: context, color: simd_float4(0.1, 0.2, 0.3, 1.0))
+        )
+        postProcessor.resize(size: (width: 4, height: 4), scaleFactor: 1.0)
+
+        XCTAssertTrue(postProcessor.draw(
+            renderPassDescriptor: renderer.makeRenderPassDescriptor(texture: try XCTUnwrap(makeTexture(device: device))),
+            frameCommand: frameCommand,
+            renderTarget: try XCTUnwrap(makeTexture(device: device))
+        ))
+        XCTAssertNil(postProcessor.renderer.lastFrameCommandDrawFailure)
+
+        renderer.commitFrameCommand(frameCommand)
+    }
+
     private func makeTexture(device: MTLDevice) -> MTLTexture? {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .bgra8Unorm,

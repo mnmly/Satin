@@ -75,6 +75,7 @@ open class Renderer {
     open func makeDefaultContext() -> Context {
         Context(
             device: context.device,
+            backend: context.requestedBackend,
             sampleCount: sampleCount,
             colorPixelFormat: colorPixelFormat,
             depthPixelFormat: depthPixelFormat,

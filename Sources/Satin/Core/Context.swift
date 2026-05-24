@@ -8,10 +8,17 @@
 
 import Metal
 
+public enum MetalBackend: Hashable, Sendable {
+    case metal3
+    case metal4
+}
+
 public struct Context {
     public let id: UUID
     public let device: MTLDevice
     public let commandQueue:MTLCommandQueue
+    public let requestedBackend: MetalBackend
+    public let backend: MetalBackend
     public let sampleCount: Int
     public let colorPixelFormat: MTLPixelFormat
     public let depthPixelFormat: MTLPixelFormat
@@ -34,9 +41,12 @@ public struct Context {
     public let velocityPixelFormat: MTLPixelFormat
     public let emissivePixelFormat: MTLPixelFormat
 
+    private let metal4SupportStorage: Any?
+
     public init(
         id: UUID = UUID(),
         device: MTLDevice,
+        backend requestedBackend: MetalBackend = .metal3,
         sampleCount: Int,
         colorPixelFormat: MTLPixelFormat,
         depthPixelFormat: MTLPixelFormat = .invalid,
@@ -55,6 +65,9 @@ public struct Context {
         self.id = id
         self.device = device
         self.commandQueue = device.makeCommandQueue()!
+        self.requestedBackend = requestedBackend
+        self.metal4SupportStorage = Self.makeMetal4Support(device: device, requestedBackend: requestedBackend, maxBuffersInFlight: maxBuffersInFlight)
+        self.backend = metal4SupportStorage == nil ? .metal3 : requestedBackend
         self.sampleCount = sampleCount
         self.colorPixelFormat = colorPixelFormat
         self.depthPixelFormat = depthPixelFormat
@@ -69,6 +82,20 @@ public struct Context {
         self.pbrPixelFormat = pbrPixelFormat
         self.velocityPixelFormat = velocityPixelFormat
         self.emissivePixelFormat = emissivePixelFormat
+    }
+
+    private static func makeMetal4Support(
+        device: MTLDevice,
+        requestedBackend: MetalBackend,
+        maxBuffersInFlight: Int
+    ) -> Any? {
+        guard requestedBackend == .metal4 else { return nil }
+
+        if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
+            return Metal4Support(device: device, maxBuffersInFlight: maxBuffersInFlight)
+        }
+
+        return nil
     }
 
     func getDefines() -> [ShaderDefine] {
@@ -93,10 +120,19 @@ public struct Context {
     }
 }
 
+@available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+extension Context {
+    internal var metal4Support: Metal4Support? {
+        metal4SupportStorage as? Metal4Support
+    }
+}
+
 extension Context: Hashable {
     public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
         hasher.combine(ObjectIdentifier(device))
+        hasher.combine(requestedBackend)
+        hasher.combine(backend)
         hasher.combine(sampleCount)
         hasher.combine(colorPixelFormat)
         hasher.combine(depthPixelFormat)
@@ -118,6 +154,8 @@ extension Context: Equatable {
     public static func == (lhs: Context, rhs: Context) -> Bool {
         lhs.id == rhs.id &&
             lhs.device === rhs.device &&
+            lhs.requestedBackend == rhs.requestedBackend &&
+            lhs.backend == rhs.backend &&
             lhs.sampleCount == rhs.sampleCount &&
             lhs.colorPixelFormat == rhs.colorPixelFormat &&
             lhs.depthPixelFormat == rhs.depthPixelFormat &&
@@ -136,12 +174,13 @@ extension Context: Equatable {
 }
 
 public extension Context {
-    static func makePlatformDefault(device: MTLDevice? = nil) -> Context {
+    static func makePlatformDefault(device: MTLDevice? = nil, backend: MetalBackend = .metal3) -> Context {
         let device = device ?? MTLCreateSystemDefaultDevice()!
 #if os(visionOS)
 #if targetEnvironment(simulator)
         return Context(
             device: device,
+            backend: backend,
             sampleCount: 1,
             colorPixelFormat: .bgra8Unorm_srgb,
             depthPixelFormat: .depth32Float,
@@ -150,6 +189,7 @@ public extension Context {
 #else
         return Context(
             device: device,
+            backend: backend,
             sampleCount: 1,
             colorPixelFormat: .bgra8Unorm_srgb,
             depthPixelFormat: .depth32Float,
@@ -159,6 +199,7 @@ public extension Context {
 #else
         return Context(
             device: device,
+            backend: backend,
             sampleCount: 1,
             colorPixelFormat: .bgra8Unorm,
             depthPixelFormat: .depth32Float

@@ -801,6 +801,7 @@ open class RenderEncoder {
 
         let renderContext = Context(
             device: context.device,
+            backend: context.requestedBackend,
             sampleCount: context.sampleCount,
             colorPixelFormat: context.colorPixelFormat,
             depthPixelFormat: context.depthPixelFormat,

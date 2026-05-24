@@ -235,7 +235,10 @@ open class TextureComputeSystem: ComputeSystem {
             computeEncoder.setComputePipelineState(pipeline)
 
             for _ in 0 ..< feedbackCount {
-                _ = bind(argumentTable, iteration: 0)
+                var offset = bind(argumentTable, iteration: 0)
+                if let preComputeMetal4 = preComputeMetal4 as? (Metal4ComputeArgumentTable, inout Int, Int) -> Void {
+                    preComputeMetal4(argumentTable, &offset, 0)
+                }
                 dispatch(metal4ComputeEncoder: computeEncoder, pipeline: pipeline, iteration: 0)
                 swapSrdDstIndex()
             }
@@ -246,7 +249,10 @@ open class TextureComputeSystem: ComputeSystem {
         if let pipeline = updatePipeline {
             computeEncoder.setComputePipelineState(pipeline)
             for iteration in 0 ..< iterations {
-                _ = bind(argumentTable, iteration: iteration)
+                var offset = bind(argumentTable, iteration: iteration)
+                if let preComputeMetal4 = preComputeMetal4 as? (Metal4ComputeArgumentTable, inout Int, Int) -> Void {
+                    preComputeMetal4(argumentTable, &offset, iteration)
+                }
                 dispatch(metal4ComputeEncoder: computeEncoder, pipeline: pipeline, iteration: iteration)
                 swapSrdDstIndex()
             }

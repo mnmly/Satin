@@ -130,6 +130,9 @@ open class TextureComputeProcessor: ComputeProcessor {
 
         if _reset, let pipeline = resetPipeline {
             computeEncoder.setComputePipelineState(pipeline)
+            if let preComputeMetal4 = preComputeMetal4 as? (Metal4ComputeArgumentTable, Int) -> Void {
+                preComputeMetal4(argumentTable, 0)
+            }
             dispatch(
                 metal4ComputeEncoder: computeEncoder,
                 pipeline: pipeline,
@@ -141,6 +144,9 @@ open class TextureComputeProcessor: ComputeProcessor {
         if let pipeline = updatePipeline {
             computeEncoder.setComputePipelineState(pipeline)
             for iteration in 0 ..< iterations {
+                if let preComputeMetal4 = preComputeMetal4 as? (Metal4ComputeArgumentTable, Int) -> Void {
+                    preComputeMetal4(argumentTable, iteration)
+                }
                 dispatch(
                     metal4ComputeEncoder: computeEncoder,
                     pipeline: pipeline,

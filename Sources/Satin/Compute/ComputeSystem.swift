@@ -37,6 +37,7 @@ open class ComputeSystem: ComputeShaderDelegate {
     public var preUpdate: ((_ computeEncoder: MTLComputeCommandEncoder, _ offset: inout Int, _ iteration: Int) -> Void)?
     public var preReset: ((_ computeEncoder: MTLComputeCommandEncoder, _ offset: inout Int, _ iteration: Int) -> Void)?
     public var preCompute: ((_ computeEncoder: MTLComputeCommandEncoder, _ offset: inout Int, _ iteration: Int) -> Void)?
+    var preComputeMetal4: Any?
 
     public private(set) var computeUniformBuffers: [ComputeBufferIndex: UniformBuffer] = [:]
     public private(set) var computeStructBuffers: [ComputeBufferIndex: BindableBuffer] = [:]

@@ -474,6 +474,88 @@ final class RendererFrameCommandTests: XCTestCase {
         renderer.commitFrameCommand(frameCommand)
     }
 
+    func testMetal4FrameCommandSupportsYcbcrConverter() throws {
+        guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) else {
+            throw XCTSkip("Metal 4 requires OS 26 or newer.")
+        }
+
+        let device = try XCTUnwrap(makeDevice())
+        let context = Context(device: device, backend: .metal4, sampleCount: 1, colorPixelFormat: .bgra8Unorm)
+        guard context.backend == .metal4 else {
+            throw XCTSkip("Metal 4 command queues are not available on this device.")
+        }
+
+        let renderer = TestRenderer(context: context)
+        let frameCommand = try XCTUnwrap(renderer.makeFrameCommand() as? Metal4FrameCommand)
+        let converter = YCbCrToRGBConverter(device: device, width: 4, height: 4)
+        let texture = try XCTUnwrap(converter.encode(
+            frameCommand: frameCommand,
+            yTexture: try XCTUnwrap(makeComputeTexture(device: device, pixelFormat: .r32Float)),
+            cbcrTexture: try XCTUnwrap(makeComputeTexture(device: device, pixelFormat: .rg32Float))
+        ))
+
+        XCTAssertEqual(texture.width, 4)
+        XCTAssertEqual(texture.height, 4)
+
+        renderer.commitFrameCommand(frameCommand)
+    }
+
+    func testMetal4FrameCommandSupportsDiffuseIblGenerator() throws {
+        guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) else {
+            throw XCTSkip("Metal 4 requires OS 26 or newer.")
+        }
+
+        let device = try XCTUnwrap(makeDevice())
+        let context = Context(device: device, backend: .metal4, sampleCount: 1, colorPixelFormat: .bgra8Unorm)
+        guard context.backend == .metal4 else {
+            throw XCTSkip("Metal 4 command queues are not available on this device.")
+        }
+
+        let renderer = TestRenderer(context: context)
+        let frameCommand = try XCTUnwrap(renderer.makeFrameCommand() as? Metal4FrameCommand)
+        let generator = DiffuseIBLGenerator(device: device)
+        let destinationTexture = try XCTUnwrap(makeCubeTexture(device: device, mipmapped: false))
+
+        generator.encode(
+            frameCommand: frameCommand,
+            sourceTexture: try XCTUnwrap(makeCubeTexture(device: device, mipmapped: false)),
+            destinationTexture: destinationTexture
+        )
+
+        XCTAssertEqual(destinationTexture.width, 4)
+        XCTAssertEqual(destinationTexture.height, 4)
+
+        renderer.commitFrameCommand(frameCommand)
+    }
+
+    func testMetal4FrameCommandSupportsSpecularIblGenerator() throws {
+        guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) else {
+            throw XCTSkip("Metal 4 requires OS 26 or newer.")
+        }
+
+        let device = try XCTUnwrap(makeDevice())
+        let context = Context(device: device, backend: .metal4, sampleCount: 1, colorPixelFormat: .bgra8Unorm)
+        guard context.backend == .metal4 else {
+            throw XCTSkip("Metal 4 command queues are not available on this device.")
+        }
+
+        let renderer = TestRenderer(context: context)
+        let frameCommand = try XCTUnwrap(renderer.makeFrameCommand() as? Metal4FrameCommand)
+        let generator = SpecularIBLGenerator(device: device)
+        let destinationTexture = try XCTUnwrap(makeCubeTexture(device: device, mipmapped: true))
+
+        generator.encode(
+            frameCommand: frameCommand,
+            sourceTexture: try XCTUnwrap(makeCubeTexture(device: device, mipmapped: true)),
+            destinationTexture: destinationTexture
+        )
+
+        XCTAssertEqual(destinationTexture.width, 4)
+        XCTAssertEqual(destinationTexture.height, 4)
+
+        renderer.commitFrameCommand(frameCommand)
+    }
+
     private func makeTexture(device: MTLDevice) -> MTLTexture? {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .bgra8Unorm,
@@ -482,6 +564,27 @@ final class RendererFrameCommandTests: XCTestCase {
             mipmapped: false
         )
         descriptor.usage = [.renderTarget]
+        return device.makeTexture(descriptor: descriptor)
+    }
+
+    private func makeComputeTexture(device: MTLDevice, pixelFormat: MTLPixelFormat) -> MTLTexture? {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: pixelFormat,
+            width: 4,
+            height: 4,
+            mipmapped: false
+        )
+        descriptor.usage = [.shaderRead, .shaderWrite]
+        return device.makeTexture(descriptor: descriptor)
+    }
+
+    private func makeCubeTexture(device: MTLDevice, mipmapped: Bool) -> MTLTexture? {
+        let descriptor = MTLTextureDescriptor.textureCubeDescriptor(
+            pixelFormat: .rgba16Float,
+            size: 4,
+            mipmapped: mipmapped
+        )
+        descriptor.usage = [.shaderRead, .shaderWrite]
         return device.makeTexture(descriptor: descriptor)
     }
 

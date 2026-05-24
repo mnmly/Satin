@@ -32,6 +32,16 @@ public class ARDepthMaskGenerator {
             index += 1
             return index
         }
+
+        @available(iOS 26.0, *)
+        override func bind(_ argumentTable: Metal4ComputeArgumentTable, iteration: Int) -> Int {
+            var index = super.bind(argumentTable, iteration: iteration)
+            argumentTable.setTexture(realDepthTexture, index: index)
+            index += 1
+            argumentTable.setTexture(virtualDepthTexture, index: index)
+            index += 1
+            return index
+        }
     }
 
     private var compute: ARDepthMaskComputeSystem
@@ -53,6 +63,15 @@ public class ARDepthMaskGenerator {
         compute.realDepthTexture = realDepthTexture
         compute.virtualDepthTexture = virtualDepthTexture
         compute.update(commandBuffer)
+        let texture = compute.dstTexture
+        texture?.label = "\(compute.label) Texture"
+        return texture
+    }
+
+    public func encode(frameCommand: any SatinFrameCommand, realDepthTexture: MTLTexture, virtualDepthTexture: MTLTexture) -> MTLTexture? {
+        compute.realDepthTexture = realDepthTexture
+        compute.virtualDepthTexture = virtualDepthTexture
+        guard compute.update(frameCommand) else { return nil }
         let texture = compute.dstTexture
         texture?.label = "\(compute.label) Texture"
         return texture

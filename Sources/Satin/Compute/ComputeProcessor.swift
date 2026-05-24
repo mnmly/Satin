@@ -32,6 +32,7 @@ open class ComputeProcessor: ComputeShaderDelegate {
     public weak var delegate: ComputeProcessorDelegate?
 
     public var preCompute: ((_ computeEncoder: MTLComputeCommandEncoder, _ iteration: Int) -> Void)?
+    var preComputeMetal4: Any?
 
     public private(set) var computeUniformBuffers: [ComputeBufferIndex: UniformBuffer] = [:]
     public private(set) var computeStructBuffers: [ComputeBufferIndex: BindableBuffer] = [:]

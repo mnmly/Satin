@@ -50,6 +50,15 @@ public final class SpecularIBLGenerator {
         compute.update(commandBuffer, iterations: iterations)
     }
 
+    public func encode(frameCommand: any SatinFrameCommand, sourceTexture: MTLTexture, destinationTexture: MTLTexture) {
+        let iterations = _encode(
+            sourceTexture: sourceTexture,
+            destinationTexture: destinationTexture
+        )
+
+        compute.update(frameCommand, iterations: iterations)
+    }
+
     private func _encode(sourceTexture: MTLTexture, destinationTexture: MTLTexture) -> Int {
         let levels = destinationTexture.mipmapLevelCount
         let resolution = sourceTexture.width
@@ -57,6 +66,11 @@ public final class SpecularIBLGenerator {
 
         compute.set(destinationTexture, index: ComputeTextureIndex.Custom0) // output
         compute.set(sourceTexture, index: ComputeTextureIndex.Custom1) // input
+
+        let faceLevelSizeResolutionBuffer = destinationTexture.device.makeBuffer(
+            length: MemoryLayout<simd_uint4>.stride,
+            options: .storageModeShared
+        )
 
         compute.preCompute = { computeEncoder, iteration in
             let face = UInt32(iteration % 6)
@@ -66,6 +80,25 @@ public final class SpecularIBLGenerator {
             var faceLevelSizeResolution = simd_make_uint4(face, level, size, resolution)
 
             computeEncoder.setBytes(&faceLevelSizeResolution, length: MemoryLayout<simd_uint4>.size, index: ComputeBufferIndex.Custom0.rawValue)
+        }
+
+        if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
+            compute.preComputeMetal4 = { (argumentTable: Metal4ComputeArgumentTable, iteration: Int) in
+                guard let faceLevelSizeResolutionBuffer else { return }
+
+                let face = UInt32(iteration % 6)
+                let level = UInt32(iteration / 6)
+                let size = UInt32(Float(width) / pow(2.0, Float(level)))
+                let resolution = UInt32(resolution)
+                var faceLevelSizeResolution = simd_make_uint4(face, level, size, resolution)
+
+                withUnsafeBytes(of: &faceLevelSizeResolution) { bytes in
+                    if let baseAddress = bytes.baseAddress {
+                        faceLevelSizeResolutionBuffer.contents().copyMemory(from: baseAddress, byteCount: bytes.count)
+                    }
+                }
+                argumentTable.setBuffer(faceLevelSizeResolutionBuffer, offset: 0, index: ComputeBufferIndex.Custom0)
+            }
         }
 
         destinationTexture.label = "Specular IBL"

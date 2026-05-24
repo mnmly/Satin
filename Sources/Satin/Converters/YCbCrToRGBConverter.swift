@@ -24,8 +24,16 @@ public final class YCbCrToRGBConverter {
         override func bind(computeEncoder: MTLComputeCommandEncoder, iteration: Int) -> Int {
             let index = super.bind(computeEncoder: computeEncoder, iteration: iteration)
             computeEncoder.setTexture(yTexture, index: index)
-            computeEncoder.setTexture(cbcrTexture, index: index)
-            return index + 1
+            computeEncoder.setTexture(cbcrTexture, index: index + 1)
+            return index + 2
+        }
+
+        @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+        override func bind(_ argumentTable: Metal4ComputeArgumentTable, iteration: Int) -> Int {
+            let index = super.bind(argumentTable, iteration: iteration)
+            argumentTable.setTexture(yTexture, index: index)
+            argumentTable.setTexture(cbcrTexture, index: index + 1)
+            return index + 2
         }
     }
 
@@ -46,6 +54,15 @@ public final class YCbCrToRGBConverter {
         compute.yTexture = yTexture
         compute.cbcrTexture = cbcrTexture
         compute.update(commandBuffer)
+        let texture = compute.dstTexture
+        texture?.label = "\(compute.label) Texture"
+        return texture
+    }
+
+    public func encode(frameCommand: any SatinFrameCommand, yTexture: MTLTexture, cbcrTexture: MTLTexture) -> MTLTexture? {
+        compute.yTexture = yTexture
+        compute.cbcrTexture = cbcrTexture
+        guard compute.update(frameCommand) else { return nil }
         let texture = compute.dstTexture
         texture?.label = "\(compute.label) Texture"
         return texture

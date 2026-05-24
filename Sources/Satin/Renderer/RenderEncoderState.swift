@@ -9,8 +9,19 @@ import Foundation
 import Metal
 
 public final class RenderEncoderState {
-    public let renderEncoder: MTLRenderCommandEncoder
+    private let classicRenderEncoder: MTLRenderCommandEncoder?
     private let commands: SatinRenderCommandEncoder
+
+    public var renderEncoder: MTLRenderCommandEncoder {
+        guard let classicRenderEncoder else {
+            preconditionFailure("MTLRenderCommandEncoder access is unavailable for Metal 4 render encoder state.")
+        }
+        return classicRenderEncoder
+    }
+
+    var supportsClassicRenderEncoder: Bool {
+        classicRenderEncoder != nil
+    }
 
     public var cullMode: MTLCullMode? {
         didSet {
@@ -220,7 +231,16 @@ public final class RenderEncoderState {
     }
 
     init(renderEncoder: MTLRenderCommandEncoder) {
-        self.renderEncoder = renderEncoder
+        self.classicRenderEncoder = renderEncoder
         self.commands = MetalRenderCommandEncoder(renderEncoder: renderEncoder)
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    init(metal4RenderEncoder: any MTL4RenderCommandEncoder, argumentTables: Metal4ArgumentTables) {
+        self.classicRenderEncoder = nil
+        self.commands = Metal4RenderCommandEncoder(
+            renderEncoder: metal4RenderEncoder,
+            argumentTables: argumentTables
+        )
     }
 }

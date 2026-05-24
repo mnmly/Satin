@@ -466,6 +466,60 @@ open class RenderEncoder {
         )
     }
 
+    @discardableResult
+    internal func draw(
+        renderPassDescriptor: MTLRenderPassDescriptor,
+        frameCommand: SatinFrameCommand,
+        scene: Object,
+        camera: Camera,
+        viewport: MTLViewport? = nil
+    ) -> Bool {
+        draw(
+            renderPassDescriptor: renderPassDescriptor,
+            frameCommand: frameCommand,
+            scene: scene,
+            cameras: [camera],
+            viewports: [viewport ?? self.viewport]
+        )
+    }
+
+    @discardableResult
+    internal func draw(
+        renderPassDescriptor: MTLRenderPassDescriptor,
+        frameCommand: SatinFrameCommand,
+        scene: Object,
+        cameras: [Camera],
+        viewports: [MTLViewport],
+        viewMappings: [MTLVertexAmplificationViewMapping] = []
+    ) -> Bool {
+        if let frameCommand = frameCommand as? MetalFrameCommand {
+            draw(
+                renderPassDescriptor: renderPassDescriptor,
+                commandBuffer: frameCommand.commandBuffer,
+                scene: scene,
+                cameras: cameras,
+                viewports: viewports,
+                viewMappings: viewMappings
+            )
+            return true
+        }
+
+        if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
+           let frameCommand = frameCommand as? Metal4FrameCommand
+        {
+            return drawMetal4Forward(
+                renderPassDescriptor: renderPassDescriptor,
+                frameCommand: frameCommand,
+                scene: scene,
+                cameras: cameras,
+                viewports: viewports,
+                viewMappings: viewMappings
+            )
+        }
+
+        return false
+    }
+
     /// Draws the scene using the current render graph.
     ///
     /// Shadow passes run before the main scene pass. Surface materials render first according to
@@ -1416,6 +1470,160 @@ open class RenderEncoder {
         return true
     }
 
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    @discardableResult
+    private func drawMetal4Forward(
+        renderPassDescriptor: MTLRenderPassDescriptor,
+        frameCommand: Metal4FrameCommand,
+        scene: Object,
+        cameras: [Camera],
+        viewports: [MTLViewport],
+        viewMappings: [MTLVertexAmplificationViewMapping]
+    ) -> Bool {
+        guard renderingMode == .forward,
+              context.sampleCount == 1,
+              context.vertexAmplificationCount == 1,
+              viewMappings.isEmpty,
+              renderPassDescriptor.colorAttachments[0].texture != nil || context.colorPixelFormat == .invalid,
+              renderPassDescriptor.depthAttachment.texture != nil || context.depthPixelFormat == .invalid,
+              renderPassDescriptor.stencilAttachment.texture != nil || context.stencilPixelFormat == .invalid
+        else { return false }
+
+        let simdViewports = viewports.map(\.float4)
+        update(commandBuffer: nil, scene: scene, cameras: cameras, viewports: simdViewports)
+
+        guard shadowCasters.isEmpty || shadowReceivers.isEmpty else { return false }
+
+        let hasAlphaTransparentRenderables = !routePassEntries(route: .alphaTransparent).isEmpty
+        guard !hasAlphaTransparentRenderables else { return false }
+
+        configureAuxiliaryAttachments(renderPassDescriptor: renderPassDescriptor, enabled: false)
+        configureMainAttachments(
+            renderPassDescriptor: renderPassDescriptor,
+            colorLoadAction: colorLoadAction,
+            depthLoadAction: depthLoadAction,
+            stencilLoadAction: stencilLoadAction,
+            colorStoreAction: colorStoreAction,
+            depthStoreAction: depthStoreAction,
+            stencilStoreAction: stencilStoreAction
+        )
+        renderPassDescriptor.colorAttachments[0].clearColor = clearColor
+        renderPassDescriptor.depthAttachment.clearDepth = clearDepth
+        renderPassDescriptor.stencilAttachment.clearStencil = clearStencil
+
+        let hasClassicTransparentRenderables = !routePassEntries(route: .classicTransparent).isEmpty
+        let opaqueEncoded = encodeMetal4Route(
+            renderPassDescriptor: renderPassDescriptor,
+            frameCommand: frameCommand,
+            route: .opaque,
+            phase: .forwardOpaque,
+            label: "Forward Opaque",
+            cameras: cameras,
+            viewports: viewports,
+            simdViewports: simdViewports,
+            viewMappings: viewMappings,
+            clearWhenEmpty: !hasClassicTransparentRenderables
+        )
+
+        var didEncode = opaqueEncoded
+        if hasClassicTransparentRenderables {
+            renderPassDescriptor.colorAttachments[0].loadAction = didEncode ? .load : colorLoadAction
+            renderPassDescriptor.depthAttachment.loadAction = didEncode ? .load : depthLoadAction
+            renderPassDescriptor.stencilAttachment.loadAction = didEncode ? .load : stencilLoadAction
+            let transparentEncoded = encodeMetal4Route(
+                renderPassDescriptor: renderPassDescriptor,
+                frameCommand: frameCommand,
+                route: .classicTransparent,
+                phase: .classicTransparent,
+                label: "Classic Transparent Forward",
+                cameras: cameras,
+                viewports: viewports,
+                simdViewports: simdViewports,
+                viewMappings: viewMappings,
+                clearWhenEmpty: !didEncode
+            )
+            didEncode = didEncode || transparentEncoded
+        }
+
+        return didEncode
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    @discardableResult
+    private func encodeMetal4Route(
+        renderPassDescriptor: MTLRenderPassDescriptor,
+        frameCommand: Metal4FrameCommand,
+        route: RenderRoute,
+        phase: MaterialPassType,
+        label: String,
+        cameras: [Camera],
+        viewports: [MTLViewport],
+        simdViewports: [simd_float4],
+        viewMappings: [MTLVertexAmplificationViewMapping],
+        clearWhenEmpty: Bool
+    ) -> Bool {
+        let routeEntries = routePassEntries(route: route)
+        if routeEntries.isEmpty {
+            guard clearWhenEmpty,
+                  let renderCommand = makeMetal4RenderCommand(renderPassDescriptor: renderPassDescriptor, frameCommand: frameCommand)
+            else { return false }
+            configureMetal4RenderEncoder(renderCommand.renderEncoder, viewports: viewports, viewMappings: viewMappings)
+            return true
+        }
+
+        for (index, entry) in routeEntries.enumerated() {
+            if index > 0 {
+                renderPassDescriptor.colorAttachments[0].loadAction = .load
+                renderPassDescriptor.depthAttachment.loadAction = .load
+                renderPassDescriptor.stencilAttachment.loadAction = .load
+            }
+
+            guard let renderCommand = makeMetal4RenderCommand(renderPassDescriptor: renderPassDescriptor, frameCommand: frameCommand),
+                  let argumentTables = Metal4ArgumentTables(device: context.device)
+            else { continue }
+
+            configureMetal4RenderEncoder(renderCommand.renderEncoder, viewports: viewports, viewMappings: viewMappings)
+            argumentTables.bind(to: renderCommand.renderEncoder)
+
+            let renderEncoderState = RenderEncoderState(
+                metal4RenderEncoder: renderCommand.renderEncoder,
+                argumentTables: argumentTables
+            )
+            encode(
+                renderEncoder: nil,
+                renderEncoderState: renderEncoderState,
+                pass: entry.pass,
+                renderables: entry.renderables,
+                cameras: cameras,
+                viewports: simdViewports,
+                phase: phase
+            )
+        }
+
+        return true
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    private func makeMetal4RenderCommand(
+        renderPassDescriptor: MTLRenderPassDescriptor,
+        frameCommand: Metal4FrameCommand
+    ) -> Metal4RenderCommand? {
+        let metal4Descriptor = Metal4RenderPassBridge.makeDescriptor(from: renderPassDescriptor)
+        guard let renderEncoder = frameCommand.commandBuffer.makeRenderCommandEncoder(descriptor: metal4Descriptor) else {
+            return nil
+        }
+        return Metal4RenderCommand(renderPassDescriptor: metal4Descriptor, renderEncoder: renderEncoder)
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    private func configureMetal4RenderEncoder(
+        _ renderEncoder: any MTL4RenderCommandEncoder,
+        viewports: [MTLViewport],
+        viewMappings: [MTLVertexAmplificationViewMapping]
+    ) {
+        renderEncoder.setViewports(viewports)
+    }
+
     @discardableResult
     private func encodeMainRenderPasses(
         renderPassDescriptor: MTLRenderPassDescriptor,
@@ -1819,7 +2027,7 @@ open class RenderEncoder {
 
     // MARK: - Internal Update
 
-    private func update(commandBuffer: MTLCommandBuffer, scene: Object, cameras: [Camera], viewports: [simd_float4]) {
+    private func update(commandBuffer: MTLCommandBuffer?, scene: Object, cameras: [Camera], viewports: [simd_float4]) {
         for camera in cameras {
             camera.update()
         }
@@ -1890,7 +2098,7 @@ open class RenderEncoder {
         }
     }
 
-    private func updateScene(commandBuffer: MTLCommandBuffer, cameras: [Camera], viewports: [simd_float4]) {
+    private func updateScene(commandBuffer: MTLCommandBuffer?, cameras: [Camera], viewports: [simd_float4]) {
         updateDirectLightingState()
 
         let lightCount = lightList.count
@@ -1976,7 +2184,9 @@ open class RenderEncoder {
                 }
             }
 
-            object.encode(commandBuffer)
+            if let commandBuffer {
+                object.encode(commandBuffer)
+            }
         }
     }
 
@@ -1992,7 +2202,28 @@ open class RenderEncoder {
         overrideMaterial: Material? = nil
     ) {
         let renderEncoderState = RenderEncoderState(renderEncoder: renderEncoder)
+        encode(
+            renderEncoder: renderEncoder,
+            renderEncoderState: renderEncoderState,
+            pass: pass,
+            renderables: renderables,
+            cameras: cameras,
+            viewports: viewports,
+            phase: phase,
+            overrideMaterial: overrideMaterial
+        )
+    }
 
+    private func encode(
+        renderEncoder: MTLRenderCommandEncoder?,
+        renderEncoderState: RenderEncoderState,
+        pass: Int,
+        renderables: [Renderable],
+        cameras: [Camera],
+        viewports: [simd_float4],
+        phase: MaterialPassType,
+        overrideMaterial: Material? = nil
+    ) {
         if !lightReceivers.isEmpty {
             if let lightBuffer = lightDataBuffer {
                 renderEncoderState.setFragmentBuffer(
@@ -2098,7 +2329,7 @@ open class RenderEncoder {
     }
 
     private func _encode(
-        renderEncoder: MTLRenderCommandEncoder,
+        renderEncoder: MTLRenderCommandEncoder?,
         renderEncoderState: RenderEncoderState,
         renderable: Renderable,
         cameras: [Camera],
@@ -2107,7 +2338,7 @@ open class RenderEncoder {
         overrideMaterial: Material? = nil
     ) {
 #if DEBUG
-        renderEncoder.pushDebugGroup(renderable.label)
+        renderEncoder?.pushDebugGroup(renderable.label)
 #endif
         let savedMaterial = renderable.material
         // Determine which context to use for pipeline/uniform lookups
@@ -2148,7 +2379,7 @@ open class RenderEncoder {
 
         renderable.preDrawState?(renderEncoderState)
         if renderEncoderState.supportsClassicRenderEncoder {
-            renderable.preDraw?(renderEncoder)
+            renderable.preDraw?(renderEncoderState.renderEncoder)
         }
 
         renderEncoderState.windingOrder = renderable.windingOrder
@@ -2178,7 +2409,7 @@ open class RenderEncoder {
         }
 
 #if DEBUG
-        renderEncoder.popDebugGroup()
+        renderEncoder?.popDebugGroup()
 #endif
     }
 

@@ -133,6 +133,60 @@ public final class SpotShadow: Shadow {
         needsUpdate = false
     }
 
+    @discardableResult
+    override public func draw(context: Context, frameCommand: any SatinFrameCommand, renderables: [Renderable]) -> Bool {
+        if let frameCommand = frameCommand as? MetalFrameCommand {
+            draw(context: context, commandBuffer: frameCommand.commandBuffer, renderables: renderables)
+            return true
+        }
+
+        guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
+              let frameCommand = frameCommand as? Metal4FrameCommand
+        else { return false }
+
+        return drawMetal4(context: context, frameCommand: frameCommand, renderables: renderables)
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    private func drawMetal4(context: Context, frameCommand: Metal4FrameCommand, renderables: [Renderable]) -> Bool {
+        guard enabled else { return true }
+
+        if device == nil {
+            device = context.device
+        }
+        setupTexture()
+
+        let renderPassDescriptor = MTLRenderPassDescriptor()
+        renderPassDescriptor.defaultRasterSampleCount = context.sampleCount
+        renderPassDescriptor.depthAttachment.texture = texture
+        renderPassDescriptor.depthAttachment.loadAction = .clear
+        renderPassDescriptor.depthAttachment.storeAction = .store
+        renderPassDescriptor.depthAttachment.clearDepth = 0.0
+        renderPassDescriptor.renderTargetWidth = resolution.width
+        renderPassDescriptor.renderTargetHeight = resolution.height
+
+        let metal4Descriptor = Metal4RenderPassBridge.makeDescriptor(from: renderPassDescriptor)
+        guard let renderEncoder = frameCommand.commandBuffer.makeRenderCommandEncoder(descriptor: metal4Descriptor),
+              let argumentTables = Metal4ArgumentTables(device: context.device)
+        else { return false }
+
+        renderEncoder.setViewports([viewport])
+        argumentTables.bind(to: renderEncoder)
+
+        let renderEncoderState = RenderEncoderState(metal4RenderEncoder: renderEncoder, argumentTables: argumentTables)
+        for renderable in renderables where renderable.isDrawable(renderContext: context, shadow: true) && renderable.castShadow {
+            renderable.update(renderContext: context, camera: camera, viewport: viewportFloat4, index: 0)
+            renderEncoderState.cullMode = renderable.cullMode
+            renderEncoderState.windingOrder = renderable.windingOrder
+            renderEncoderState.triangleFillMode = renderable.triangleFillMode
+            renderable.draw(renderContext: context, renderEncoderState: renderEncoderState, shadow: true)
+        }
+
+        renderEncoder.endEncoding()
+        needsUpdate = false
+        return true
+    }
+
     private func setupTexture() {
         guard let device, _updateTexture, resolution.width > 1, resolution.height > 1 else { return }
 

@@ -64,4 +64,13 @@ public class Shadow {
     public func draw(context: Context, commandBuffer: MTLCommandBuffer, renderables: [Renderable]) {
         fatalError("Subclasses must overload")
     }
+
+    @discardableResult
+    public func draw(context: Context, frameCommand: any SatinFrameCommand, renderables: [Renderable]) -> Bool {
+        if let frameCommand = frameCommand as? MetalFrameCommand {
+            draw(context: context, commandBuffer: frameCommand.commandBuffer, renderables: renderables)
+            return true
+        }
+        return false
+    }
 }

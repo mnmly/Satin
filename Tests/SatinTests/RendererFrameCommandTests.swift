@@ -243,6 +243,65 @@ final class RendererFrameCommandTests: XCTestCase {
         renderer.commitFrameCommand(frameCommand)
     }
 
+    func testMetal4FrameCommandDrawSupportsDirectionalShadows() throws {
+        guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) else {
+            throw XCTSkip("Metal 4 requires OS 26 or newer.")
+        }
+
+        let device = try XCTUnwrap(makeDevice())
+        let context = Context(
+            device: device,
+            backend: .metal4,
+            sampleCount: 1,
+            colorPixelFormat: .bgra8Unorm,
+            depthPixelFormat: .depth32Float
+        )
+        guard context.backend == .metal4 else {
+            throw XCTSkip("Metal 4 command queues are not available on this device.")
+        }
+
+        let renderer = TestRenderer(context: context)
+        let frameCommand = try XCTUnwrap(renderer.makeFrameCommand() as? Metal4FrameCommand)
+        let renderEncoder = RenderEncoder(context: context)
+        let scene = Object(context: context)
+
+        let light = DirectionalLight(context: context, color: simd_float3(repeating: 1.0), intensity: 1.0)
+        light.position = [2.0, 3.0, 2.0]
+        light.lookAt(target: .zero, up: Satin.worldUpDirection)
+        light.castShadow = true
+        light.shadow.resolution = (width: 4, height: 4)
+
+        let receiver = Mesh(
+            context: context,
+            geometry: PlaneGeometry(context: context, size: 2.0, orientation: .zx),
+            material: BasicDiffuseMaterial(context: context, color: simd_float4(0.35, 0.35, 0.4, 1.0))
+        )
+        receiver.receiveShadow = true
+
+        let caster = Mesh(
+            context: context,
+            geometry: PlaneGeometry(context: context, width: 0.5, height: 0.5),
+            material: BasicDiffuseMaterial(context: context, color: simd_float4(0.9, 0.2, 0.1, 1.0))
+        )
+        caster.position.y = 0.5
+        caster.castShadow = true
+
+        scene.add(light)
+        scene.add(receiver)
+        scene.add(caster)
+
+        XCTAssertTrue(renderEncoder.draw(
+            renderPassDescriptor: renderer.makeRenderPassDescriptor(texture: try XCTUnwrap(makeTexture(device: device))),
+            frameCommand: frameCommand,
+            scene: scene,
+            camera: PerspectiveCamera(context: context, position: [0.0, 0.75, 4.0], near: 0.1, far: 100.0, fov: 30.0),
+            viewport: MTLViewport(originX: 0, originY: 0, width: 4, height: 4, znear: 0, zfar: 1)
+        ))
+        XCTAssertNil(renderEncoder.lastFrameCommandDrawFailure)
+
+        renderer.commitFrameCommand(frameCommand)
+    }
+
     private func makeTexture(device: MTLDevice) -> MTLTexture? {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .bgra8Unorm,

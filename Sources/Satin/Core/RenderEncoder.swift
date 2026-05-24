@@ -1510,8 +1510,14 @@ open class RenderEncoder {
         let simdViewports = viewports.map(\.float4)
         update(commandBuffer: nil, frameCommand: frameCommand, scene: scene, cameras: cameras, viewports: simdViewports)
 
-        guard shadowCasters.isEmpty || shadowReceivers.isEmpty else {
-            return failFrameCommandDraw("Metal 4 frame-command rendering currently does not support shadow passes.")
+        if !shadowCasters.isEmpty, !shadowReceivers.isEmpty {
+            for light in lightList where light.castShadow {
+                if light.shadow.shouldRender {
+                    guard light.shadow.draw(context: context, frameCommand: frameCommand, renderables: shadowCasters) else {
+                        return failFrameCommandDraw("Metal 4 frame-command rendering currently does not support shadow passes.")
+                    }
+                }
+            }
         }
 
         let hasAlphaTransparentRenderables = !routePassEntries(route: .alphaTransparent).isEmpty

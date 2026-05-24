@@ -92,6 +92,31 @@ open class TessellationProcessor<T>: ComputeProcessor, Tessellator {
         }
     }
 
+    @discardableResult
+    override public func update(_ frameCommand: any SatinFrameCommand, iterations: Int = 1) -> Bool {
+        if let frameCommand = frameCommand as? MetalFrameCommand {
+            update(frameCommand.commandBuffer, iterations: iterations)
+            return true
+        }
+
+        guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
+              let frameCommand = frameCommand as? Metal4FrameCommand
+        else { return false }
+
+        super.update()
+        guard (_reset && resetPipeline != nil) || updatePipeline != nil else { return true }
+        guard factorsBuffer != nil,
+              let computeEncoder = frameCommand.commandBuffer.makeComputeCommandEncoder(),
+              let argumentTable = Metal4ComputeArgumentTable(device: device)
+        else { return false }
+
+        computeEncoder.label = label
+        argumentTable.bind(to: computeEncoder)
+        encode(computeEncoder, argumentTable: argumentTable, iterations: iterations)
+        computeEncoder.endEncoding()
+        return true
+    }
+
     private func encode(_ computeEncoder: MTLComputeCommandEncoder, iterations: Int = 1) {
         bindUniforms(computeEncoder)
         bindBuffers(computeEncoder)
@@ -121,6 +146,40 @@ open class TessellationProcessor<T>: ComputeProcessor, Tessellator {
         }
     }
 
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    private func encode(_ computeEncoder: any MTL4ComputeCommandEncoder, argumentTable: Metal4ComputeArgumentTable, iterations: Int = 1) {
+        bindUniforms(argumentTable)
+        bindBuffers(argumentTable)
+        bindTextures(argumentTable)
+
+        if _reset, let pipeline = resetPipeline {
+            computeEncoder.setComputePipelineState(pipeline)
+            if let preComputeMetal4 = preComputeMetal4 as? (Metal4ComputeArgumentTable, Int) -> Void {
+                preComputeMetal4(argumentTable, 0)
+            }
+            dispatch(
+                metal4ComputeEncoder: computeEncoder,
+                pipeline: pipeline,
+                iteration: 0
+            )
+            _reset = false
+        }
+
+        if let pipeline = updatePipeline {
+            computeEncoder.setComputePipelineState(pipeline)
+            for iteration in 0 ..< iterations {
+                if let preComputeMetal4 = preComputeMetal4 as? (Metal4ComputeArgumentTable, Int) -> Void {
+                    preComputeMetal4(argumentTable, iteration)
+                }
+                dispatch(
+                    metal4ComputeEncoder: computeEncoder,
+                    pipeline: pipeline,
+                    iteration: iteration
+                )
+            }
+        }
+    }
+
     // MARK: - Dispatching
 
     #if os(macOS) || os(iOS) || os(visionOS)
@@ -134,6 +193,18 @@ open class TessellationProcessor<T>: ComputeProcessor, Tessellator {
             let threadsPerThreadgroup = MTLSizeMake(threadGroupSize, 1, 1)
             computeEncoder.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
         }
+
+        @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+        override open func dispatchThreads(metal4ComputeEncoder: any MTL4ComputeCommandEncoder, pipeline: MTLComputePipelineState, iteration: Int) {
+            let patchCount = geometry.patchCount
+            let threadsPerGrid = MTLSizeMake(patchCount, 1, 1)
+
+            var threadGroupSize = pipeline.maxTotalThreadsPerThreadgroup
+            threadGroupSize = threadGroupSize > patchCount ? 32 * max(patchCount / 32, 1) : threadGroupSize
+
+            let threadsPerThreadgroup = MTLSizeMake(threadGroupSize, 1, 1)
+            metal4ComputeEncoder.dispatchThreads(threadsPerGrid: threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
+        }
     #endif
 
     override open func dispatchThreadgroups(computeEncoder: MTLComputeCommandEncoder, pipeline: MTLComputePipelineState, iteration: Int) {
@@ -146,5 +217,18 @@ open class TessellationProcessor<T>: ComputeProcessor, Tessellator {
             depth: 1
         )
         computeEncoder.dispatchThreadgroups(threadgroupsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    override open func dispatchThreadgroups(metal4ComputeEncoder: any MTL4ComputeCommandEncoder, pipeline: MTLComputePipelineState, iteration: Int) {
+        let maxTotalThreadsPerThreadgroup = pipeline.maxTotalThreadsPerThreadgroup
+        let patchCount = geometry.patchCount
+        let threadsPerThreadgroup = MTLSizeMake(maxTotalThreadsPerThreadgroup, 1, 1)
+        let threadgroupsPerGrid = MTLSize(
+            width: (patchCount + maxTotalThreadsPerThreadgroup - 1) / maxTotalThreadsPerThreadgroup,
+            height: 1,
+            depth: 1
+        )
+        metal4ComputeEncoder.dispatchThreadgroups(threadgroupsPerGrid: threadgroupsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
     }
 }

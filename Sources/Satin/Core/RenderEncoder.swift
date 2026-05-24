@@ -1487,8 +1487,12 @@ open class RenderEncoder {
             return failFrameCommandDraw("Metal 4 frame-command rendering currently supports forward rendering mode only.")
         }
 
-        guard context.vertexAmplificationCount == 1, viewMappings.isEmpty else {
+        guard context.vertexAmplificationCount <= 2 else {
             return failFrameCommandDraw("Metal 4 frame-command rendering currently does not support vertex amplification.")
+        }
+
+        guard viewMappings.isEmpty else {
+            return failFrameCommandDraw("Metal 4 frame-command rendering currently does not support custom vertex amplification view mappings.")
         }
 
         guard renderPassDescriptor.colorAttachments[0].texture != nil || context.colorPixelFormat == .invalid else {
@@ -1682,6 +1686,9 @@ open class RenderEncoder {
         viewMappings: [MTLVertexAmplificationViewMapping]
     ) {
         renderEncoder.setViewports(viewports)
+        if context.vertexAmplificationCount > 1 {
+            renderEncoder.setVertexAmplificationCount(context.vertexAmplificationCount)
+        }
     }
 
     @discardableResult

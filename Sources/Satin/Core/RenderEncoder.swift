@@ -1515,9 +1515,6 @@ open class RenderEncoder {
         }
 
         let hasAlphaTransparentRenderables = !routePassEntries(route: .alphaTransparent).isEmpty
-        guard !hasAlphaTransparentRenderables else {
-            return failFrameCommandDraw("Metal 4 frame-command rendering currently does not support alpha OIT.")
-        }
 
         configureAuxiliaryAttachments(renderPassDescriptor: renderPassDescriptor, enabled: false)
         configureMainAttachments(
@@ -1545,10 +1542,39 @@ open class RenderEncoder {
             viewports: viewports,
             simdViewports: simdViewports,
             viewMappings: viewMappings,
-            clearWhenEmpty: !hasClassicTransparentRenderables
+            clearWhenEmpty: !hasAlphaTransparentRenderables && !hasClassicTransparentRenderables
         )
 
         var didEncode = opaqueEncoded
+        if hasAlphaTransparentRenderables {
+            configureMainAttachments(
+                renderPassDescriptor: renderPassDescriptor,
+                colorLoadAction: didEncode ? .load : colorLoadAction,
+                depthLoadAction: didEncode ? .load : depthLoadAction,
+                stencilLoadAction: didEncode ? .load : stencilLoadAction,
+                colorStoreAction: hasClassicTransparentRenderables ? .store : colorStoreAction,
+                depthStoreAction: hasClassicTransparentRenderables ? .store : depthStoreAction,
+                stencilStoreAction: hasClassicTransparentRenderables ? .store : stencilStoreAction
+            )
+            configureMainStoreActionsForSampleCount(renderPassDescriptor: renderPassDescriptor)
+            let alphaEncoded = encodeMetal4AlphaOitRoute(
+                renderPassDescriptor: renderPassDescriptor,
+                frameCommand: frameCommand,
+                cameras: cameras,
+                viewports: viewports,
+                simdViewports: simdViewports,
+                viewMappings: viewMappings,
+                clearWhenEmpty: !didEncode,
+                colorLoadAction: didEncode ? .load : colorLoadAction,
+                depthLoadAction: didEncode ? .load : depthLoadAction,
+                stencilLoadAction: didEncode ? .load : stencilLoadAction,
+                colorStoreAction: hasClassicTransparentRenderables ? .store : colorStoreAction,
+                depthStoreAction: hasClassicTransparentRenderables ? .store : depthStoreAction,
+                stencilStoreAction: hasClassicTransparentRenderables ? .store : stencilStoreAction
+            )
+            didEncode = didEncode || alphaEncoded
+        }
+
         if hasClassicTransparentRenderables {
             renderPassDescriptor.colorAttachments[0].loadAction = didEncode ? .load : colorLoadAction
             renderPassDescriptor.depthAttachment.loadAction = didEncode ? .load : depthLoadAction
@@ -1603,6 +1629,90 @@ open class RenderEncoder {
     private func failFrameCommandDraw(_ reason: String) -> Bool {
         lastFrameCommandDrawFailure = reason
         return false
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    @discardableResult
+    private func encodeMetal4AlphaOitRoute(
+        renderPassDescriptor: MTLRenderPassDescriptor,
+        frameCommand: Metal4FrameCommand,
+        cameras: [Camera],
+        viewports: [MTLViewport],
+        simdViewports: [simd_float4],
+        viewMappings: [MTLVertexAmplificationViewMapping],
+        clearWhenEmpty: Bool,
+        colorLoadAction: MTLLoadAction,
+        depthLoadAction: MTLLoadAction,
+        stencilLoadAction: MTLLoadAction,
+        colorStoreAction: MTLStoreAction,
+        depthStoreAction: MTLStoreAction,
+        stencilStoreAction: MTLStoreAction
+    ) -> Bool {
+        let routeEntries = routePassEntries(route: .alphaTransparent)
+        guard !routeEntries.isEmpty || clearWhenEmpty else { return false }
+
+        do {
+            let resources = try alphaOitResources.load()
+            guard let imageblockSampleLength = alphaOitImageblockSampleLength(for: routeEntries) else {
+                return false
+            }
+            try prepareAlphaOitPassDescriptor(
+                renderPassDescriptor,
+                imageblockSampleLength: imageblockSampleLength,
+                colorLoadAction: colorLoadAction,
+                depthLoadAction: depthLoadAction,
+                stencilLoadAction: stencilLoadAction,
+                colorStoreAction: colorStoreAction,
+                depthStoreAction: depthStoreAction,
+                stencilStoreAction: stencilStoreAction
+            )
+            configureMainStoreActionsForSampleCount(renderPassDescriptor: renderPassDescriptor)
+
+            guard let renderCommand = makeMetal4RenderCommand(renderPassDescriptor: renderPassDescriptor, frameCommand: frameCommand),
+                  let argumentTables = Metal4ArgumentTables(device: context.device)
+            else {
+                return failFrameCommandDraw("Metal 4 alpha OIT render command encoder could not be created.")
+            }
+
+            configureMetal4RenderEncoder(renderCommand.renderEncoder, viewports: viewports, viewMappings: viewMappings)
+
+#if DEBUG
+            renderCommand.renderEncoder.pushDebugGroup("Alpha OIT Tile Init")
+#endif
+            renderCommand.renderEncoder.setRenderPipelineState(resources.tilePipeline)
+            renderCommand.renderEncoder.dispatchThreadsPerTile(alphaOitTileSize)
+#if DEBUG
+            renderCommand.renderEncoder.popDebugGroup()
+#endif
+
+            argumentTables.bind(to: renderCommand.renderEncoder)
+            let renderEncoderState = RenderEncoderState(
+                metal4RenderEncoder: renderCommand.renderEncoder,
+                argumentTables: argumentTables
+            )
+
+            for entry in routeEntries {
+                encode(
+                    renderEncoder: nil,
+                    renderEncoderState: renderEncoderState,
+                    pass: entry.pass,
+                    renderables: entry.renderables,
+                    cameras: cameras,
+                    viewports: simdViewports,
+                    phase: .alphaTransparent
+                )
+            }
+
+            renderCommand.renderEncoder.setRenderPipelineState(resources.blendPipeline)
+            renderCommand.renderEncoder.setDepthStencilState(resources.blendDepthStencilState)
+            renderCommand.renderEncoder.setCullMode(.none)
+            renderCommand.renderEncoder.drawPrimitives(primitiveType: .triangle, vertexStart: 0, vertexCount: 3)
+            renderCommand.renderEncoder.endEncoding()
+
+            return true
+        } catch {
+            return failFrameCommandDraw("Metal 4 alpha OIT failed: \(error.localizedDescription)")
+        }
     }
 
     @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)

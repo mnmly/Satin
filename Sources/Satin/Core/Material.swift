@@ -495,6 +495,12 @@ open class Material: Codable {
 
     open func encode(_ commandBuffer: MTLCommandBuffer) {}
 
+    open func encode(frameCommand: any SatinFrameCommand) {
+        if let frameCommand = frameCommand as? MetalFrameCommand {
+            encode(frameCommand.commandBuffer)
+        }
+    }
+
     open func bindPipeline(renderContext: Context, renderEncoderState: RenderEncoderState, shadow: Bool) {
         guard let pipeline = shader?.getPipeline(renderContext: renderContext, shadow: shadow) else { return }
         renderEncoderState.pipeline = pipeline

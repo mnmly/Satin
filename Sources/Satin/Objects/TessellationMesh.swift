@@ -46,6 +46,13 @@ open class TessellationMesh: Mesh {
         super.encode(commandBuffer)
     }
 
+    override public func encode(frameCommand: any SatinFrameCommand) {
+        if tessellate, let frameCommand = frameCommand as? MetalFrameCommand {
+            tessellator.update(frameCommand.commandBuffer, iterations: 1)
+        }
+        super.encode(frameCommand: frameCommand)
+    }
+
     // MARK: - Draw
 
     override public func draw(renderContext: Context, renderEncoderState: RenderEncoderState, instanceCount: Int, shadow: Bool) {

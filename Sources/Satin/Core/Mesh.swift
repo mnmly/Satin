@@ -216,6 +216,15 @@ open class Mesh: Renderable {
         super.encode(commandBuffer)
     }
 
+    override open func encode(frameCommand: any SatinFrameCommand) {
+        geometry.encode(frameCommand: frameCommand)
+        material?.encode(frameCommand: frameCommand)
+        for submesh in submeshes {
+            submesh.encode(frameCommand: frameCommand)
+        }
+        super.encode(frameCommand: frameCommand)
+    }
+
     override open func update(renderContext: Context, camera: Camera, viewport: simd_float4, index: Int) {
         vertexUniforms[renderContext.id]?.update(
             object: self,

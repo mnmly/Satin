@@ -63,6 +63,11 @@ public final class ParametricGeometry: Geometry {
         super.encode(commandBuffer)
     }
 
+    override public func encode(frameCommand: any SatinFrameCommand) {
+        updateGeometry()
+        super.encode(frameCommand: frameCommand)
+    }
+
     func setupGeometry() {
         generateGeometry()
 

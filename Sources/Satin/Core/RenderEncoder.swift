@@ -1490,7 +1490,7 @@ open class RenderEncoder {
         else { return false }
 
         let simdViewports = viewports.map(\.float4)
-        update(commandBuffer: nil, scene: scene, cameras: cameras, viewports: simdViewports)
+        update(commandBuffer: nil, frameCommand: frameCommand, scene: scene, cameras: cameras, viewports: simdViewports)
 
         guard shadowCasters.isEmpty || shadowReceivers.isEmpty else { return false }
 
@@ -2027,7 +2027,13 @@ open class RenderEncoder {
 
     // MARK: - Internal Update
 
-    private func update(commandBuffer: MTLCommandBuffer?, scene: Object, cameras: [Camera], viewports: [simd_float4]) {
+    private func update(
+        commandBuffer: MTLCommandBuffer?,
+        frameCommand: (any SatinFrameCommand)? = nil,
+        scene: Object,
+        cameras: [Camera],
+        viewports: [simd_float4]
+    ) {
         for camera in cameras {
             camera.update()
         }
@@ -2050,6 +2056,7 @@ open class RenderEncoder {
 
         updateScene(
             commandBuffer: commandBuffer,
+            frameCommand: frameCommand,
             cameras: cameras,
             viewports: viewports
         )
@@ -2098,7 +2105,12 @@ open class RenderEncoder {
         }
     }
 
-    private func updateScene(commandBuffer: MTLCommandBuffer?, cameras: [Camera], viewports: [simd_float4]) {
+    private func updateScene(
+        commandBuffer: MTLCommandBuffer?,
+        frameCommand: (any SatinFrameCommand)? = nil,
+        cameras: [Camera],
+        viewports: [simd_float4]
+    ) {
         updateDirectLightingState()
 
         let lightCount = lightList.count
@@ -2184,7 +2196,9 @@ open class RenderEncoder {
                 }
             }
 
-            if let commandBuffer {
+            if let frameCommand {
+                object.encode(frameCommand: frameCommand)
+            } else if let commandBuffer {
                 object.encode(commandBuffer)
             }
         }

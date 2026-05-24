@@ -125,6 +125,12 @@ open class Geometry: BufferAttributeDelegate, InterleavedBufferDelegate, Element
 
     open func encode(_ commandBuffer: MTLCommandBuffer) {}
 
+    open func encode(frameCommand: any SatinFrameCommand) {
+        if let frameCommand = frameCommand as? MetalFrameCommand {
+            encode(frameCommand.commandBuffer)
+        }
+    }
+
     // MARK: - Bind
 
     open func bind(renderEncoderState: RenderEncoderState, shadow: Bool) {

@@ -74,6 +74,11 @@ open class Submesh {
         geometry.encode(commandBuffer)
     }
 
+    open func encode(frameCommand: any SatinFrameCommand) {
+        material?.encode(frameCommand: frameCommand)
+        geometry.encode(frameCommand: frameCommand)
+    }
+
     open func setupMaterial() {
         guard let material, let parent else { return }
         material.vertexDescriptor = parent.geometry.vertexDescriptor

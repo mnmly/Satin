@@ -97,6 +97,11 @@ public class ARLidarMesh: Renderable {
         super.encode(commandBuffer)
     }
 
+    override public func encode(frameCommand: any SatinFrameCommand) {
+        material?.encode(frameCommand: frameCommand)
+        super.encode(frameCommand: frameCommand)
+    }
+
     override public func update(renderContext: Context, camera: Camera, viewport: simd_float4, index: Int) {
         if let meshAnchor = meshAnchor { localMatrix = meshAnchor.transform }
         vertexUniforms[renderContext.id]?.update(object: self, camera: camera, viewport: viewport, index: index)

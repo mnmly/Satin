@@ -14,6 +14,7 @@ open class RenderEncoder {
     public var label = "Satin RenderEncoder"
 
     public var onUpdate: (() -> Void)?
+    public private(set) var lastFrameCommandDrawFailure: String?
 
     public var sortObjects: Bool
 
@@ -492,6 +493,8 @@ open class RenderEncoder {
         viewports: [MTLViewport],
         viewMappings: [MTLVertexAmplificationViewMapping] = []
     ) -> Bool {
+        lastFrameCommandDrawFailure = nil
+
         if let frameCommand = frameCommand as? MetalFrameCommand {
             draw(
                 renderPassDescriptor: renderPassDescriptor,
@@ -517,7 +520,7 @@ open class RenderEncoder {
             )
         }
 
-        return false
+        return failFrameCommandDraw("Unsupported frame command backend: \(frameCommand.backend).")
     }
 
     /// Draws the scene using the current render graph.
@@ -1480,22 +1483,41 @@ open class RenderEncoder {
         viewports: [MTLViewport],
         viewMappings: [MTLVertexAmplificationViewMapping]
     ) -> Bool {
-        guard renderingMode == .forward,
-              context.sampleCount == 1,
-              context.vertexAmplificationCount == 1,
-              viewMappings.isEmpty,
-              renderPassDescriptor.colorAttachments[0].texture != nil || context.colorPixelFormat == .invalid,
-              renderPassDescriptor.depthAttachment.texture != nil || context.depthPixelFormat == .invalid,
-              renderPassDescriptor.stencilAttachment.texture != nil || context.stencilPixelFormat == .invalid
-        else { return false }
+        guard renderingMode == .forward else {
+            return failFrameCommandDraw("Metal 4 frame-command rendering currently supports forward rendering mode only.")
+        }
+
+        guard context.sampleCount == 1 else {
+            return failFrameCommandDraw("Metal 4 frame-command rendering currently does not support multisample render targets.")
+        }
+
+        guard context.vertexAmplificationCount == 1, viewMappings.isEmpty else {
+            return failFrameCommandDraw("Metal 4 frame-command rendering currently does not support vertex amplification.")
+        }
+
+        guard renderPassDescriptor.colorAttachments[0].texture != nil || context.colorPixelFormat == .invalid else {
+            return failFrameCommandDraw("Metal 4 frame-command rendering requires a color attachment texture.")
+        }
+
+        guard renderPassDescriptor.depthAttachment.texture != nil || context.depthPixelFormat == .invalid else {
+            return failFrameCommandDraw("Metal 4 frame-command rendering requires a depth attachment texture.")
+        }
+
+        guard renderPassDescriptor.stencilAttachment.texture != nil || context.stencilPixelFormat == .invalid else {
+            return failFrameCommandDraw("Metal 4 frame-command rendering requires a stencil attachment texture.")
+        }
 
         let simdViewports = viewports.map(\.float4)
         update(commandBuffer: nil, frameCommand: frameCommand, scene: scene, cameras: cameras, viewports: simdViewports)
 
-        guard shadowCasters.isEmpty || shadowReceivers.isEmpty else { return false }
+        guard shadowCasters.isEmpty || shadowReceivers.isEmpty else {
+            return failFrameCommandDraw("Metal 4 frame-command rendering currently does not support shadow passes.")
+        }
 
         let hasAlphaTransparentRenderables = !routePassEntries(route: .alphaTransparent).isEmpty
-        guard !hasAlphaTransparentRenderables else { return false }
+        guard !hasAlphaTransparentRenderables else {
+            return failFrameCommandDraw("Metal 4 frame-command rendering currently does not support alpha OIT.")
+        }
 
         configureAuxiliaryAttachments(renderPassDescriptor: renderPassDescriptor, enabled: false)
         configureMainAttachments(
@@ -1546,6 +1568,12 @@ open class RenderEncoder {
         }
 
         return didEncode
+    }
+
+    @discardableResult
+    private func failFrameCommandDraw(_ reason: String) -> Bool {
+        lastFrameCommandDrawFailure = reason
+        return false
     }
 
     @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)

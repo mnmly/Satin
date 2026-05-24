@@ -51,10 +51,16 @@ final class RenderEncoderStateBackendTests: XCTestCase {
 
         XCTAssertFalse(state.supportsClassicRenderEncoder)
         XCTAssertFalse(state.supportsTessellation)
+        XCTAssertNil(state.lastBindingFailure)
 
         let texture = try XCTUnwrap(makeTexture(device: device))
         state.setFragmentTextures([texture], startIndex: .Projector0)
+        XCTAssertNil(state.lastBindingFailure)
         state.useFragmentResource(texture)
+
+        let buffer = try XCTUnwrap(device.makeBuffer(length: 256))
+        state.setVertexBuffer(buffer, offset: 0, index: .Custom11)
+        XCTAssertEqual(state.lastBindingFailure, "Binding is outside Metal 4 argument table limits.")
 
         let tessellationFactorBuffer = try XCTUnwrap(device.makeBuffer(length: 256))
         XCTAssertFalse(state.setTessellationFactorBuffer(tessellationFactorBuffer, offset: 0, instanceStride: 0))

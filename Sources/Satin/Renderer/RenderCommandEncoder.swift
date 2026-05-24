@@ -9,6 +9,7 @@ import Metal
 
 internal protocol SatinRenderCommandEncoder {
     var supportsTessellation: Bool { get }
+    var lastBindingFailure: String? { get }
 
     func setCullMode(_ cullMode: MTLCullMode)
     func setFrontFacing(_ windingOrder: MTLWinding)
@@ -17,12 +18,18 @@ internal protocol SatinRenderCommandEncoder {
     func setDepthStencilState(_ depthStencilState: MTLDepthStencilState?)
     func setDepthClipMode(_ depthClipMode: MTLDepthClipMode)
     func setDepthBias(_ depthBias: Float, slopeScale: Float, clamp: Float)
-    func setVertexBuffer(_ buffer: MTLBuffer, offset: Int, index: Int)
-    func setFragmentBuffer(_ buffer: MTLBuffer, offset: Int, index: Int)
-    func setVertexTexture(_ texture: MTLTexture?, index: Int)
-    func setFragmentTexture(_ texture: MTLTexture?, index: Int)
-    func setFragmentTextures(_ textures: [MTLTexture?], range: Range<Int>)
-    func setFragmentSamplerState(_ samplerState: MTLSamplerState?, index: Int)
+    @discardableResult
+    func setVertexBuffer(_ buffer: MTLBuffer, offset: Int, index: Int) -> Bool
+    @discardableResult
+    func setFragmentBuffer(_ buffer: MTLBuffer, offset: Int, index: Int) -> Bool
+    @discardableResult
+    func setVertexTexture(_ texture: MTLTexture?, index: Int) -> Bool
+    @discardableResult
+    func setFragmentTexture(_ texture: MTLTexture?, index: Int) -> Bool
+    @discardableResult
+    func setFragmentTextures(_ textures: [MTLTexture?], range: Range<Int>) -> Bool
+    @discardableResult
+    func setFragmentSamplerState(_ samplerState: MTLSamplerState?, index: Int) -> Bool
     func useResource(_ resource: MTLResource, usage: MTLResourceUsage, stages: MTLRenderStages)
     func drawPrimitives(type: MTLPrimitiveType, vertexStart: Int, vertexCount: Int, instanceCount: Int)
     func drawIndexedPrimitives(
@@ -60,6 +67,7 @@ internal final class MetalRenderCommandEncoder: SatinRenderCommandEncoder {
     private let renderEncoder: MTLRenderCommandEncoder
 
     let supportsTessellation = true
+    let lastBindingFailure: String? = nil
 
     init(renderEncoder: MTLRenderCommandEncoder) {
         self.renderEncoder = renderEncoder
@@ -93,28 +101,34 @@ internal final class MetalRenderCommandEncoder: SatinRenderCommandEncoder {
         renderEncoder.setDepthBias(depthBias, slopeScale: slopeScale, clamp: clamp)
     }
 
-    func setVertexBuffer(_ buffer: MTLBuffer, offset: Int, index: Int) {
+    func setVertexBuffer(_ buffer: MTLBuffer, offset: Int, index: Int) -> Bool {
         renderEncoder.setVertexBuffer(buffer, offset: offset, index: index)
+        return true
     }
 
-    func setFragmentBuffer(_ buffer: MTLBuffer, offset: Int, index: Int) {
+    func setFragmentBuffer(_ buffer: MTLBuffer, offset: Int, index: Int) -> Bool {
         renderEncoder.setFragmentBuffer(buffer, offset: offset, index: index)
+        return true
     }
 
-    func setVertexTexture(_ texture: MTLTexture?, index: Int) {
+    func setVertexTexture(_ texture: MTLTexture?, index: Int) -> Bool {
         renderEncoder.setVertexTexture(texture, index: index)
+        return true
     }
 
-    func setFragmentTexture(_ texture: MTLTexture?, index: Int) {
+    func setFragmentTexture(_ texture: MTLTexture?, index: Int) -> Bool {
         renderEncoder.setFragmentTexture(texture, index: index)
+        return true
     }
 
-    func setFragmentTextures(_ textures: [MTLTexture?], range: Range<Int>) {
+    func setFragmentTextures(_ textures: [MTLTexture?], range: Range<Int>) -> Bool {
         renderEncoder.setFragmentTextures(textures, range: range)
+        return true
     }
 
-    func setFragmentSamplerState(_ samplerState: MTLSamplerState?, index: Int) {
+    func setFragmentSamplerState(_ samplerState: MTLSamplerState?, index: Int) -> Bool {
         renderEncoder.setFragmentSamplerState(samplerState, index: index)
+        return true
     }
 
     func useResource(_ resource: MTLResource, usage: MTLResourceUsage, stages: MTLRenderStages) {
@@ -207,6 +221,7 @@ internal final class Metal4RenderCommandEncoder: SatinRenderCommandEncoder {
     private let argumentTables: Metal4ArgumentTables
 
     let supportsTessellation = false
+    private(set) var lastBindingFailure: String?
 
     init(renderEncoder: any MTL4RenderCommandEncoder, argumentTables: Metal4ArgumentTables) {
         self.renderEncoder = renderEncoder
@@ -242,39 +257,65 @@ internal final class Metal4RenderCommandEncoder: SatinRenderCommandEncoder {
         renderEncoder.setDepthBias(depthBias, slopeScale: slopeScale, clamp: clamp)
     }
 
-    func setVertexBuffer(_ buffer: MTLBuffer, offset: Int, index: Int) {
-        guard let vertexBufferIndex = VertexBufferIndex(rawValue: index) else { return }
-        argumentTables.setVertexBuffer(buffer, offset: offset, index: vertexBufferIndex)
+    func setVertexBuffer(_ buffer: MTLBuffer, offset: Int, index: Int) -> Bool {
+        guard let vertexBufferIndex = VertexBufferIndex(rawValue: index) else {
+            return failBinding("Unsupported Metal 4 vertex buffer index \(index).")
+        }
+        return setBinding(argumentTables.setVertexBuffer(buffer, offset: offset, index: vertexBufferIndex))
     }
 
-    func setFragmentBuffer(_ buffer: MTLBuffer, offset: Int, index: Int) {
-        guard let fragmentBufferIndex = FragmentBufferIndex(rawValue: index) else { return }
-        argumentTables.setFragmentBuffer(buffer, offset: offset, index: fragmentBufferIndex)
+    func setFragmentBuffer(_ buffer: MTLBuffer, offset: Int, index: Int) -> Bool {
+        guard let fragmentBufferIndex = FragmentBufferIndex(rawValue: index) else {
+            return failBinding("Unsupported Metal 4 fragment buffer index \(index).")
+        }
+        return setBinding(argumentTables.setFragmentBuffer(buffer, offset: offset, index: fragmentBufferIndex))
     }
 
-    func setVertexTexture(_ texture: MTLTexture?, index: Int) {
-        guard let vertexTextureIndex = VertexTextureIndex(rawValue: index) else { return }
-        argumentTables.setVertexTexture(texture, index: vertexTextureIndex)
+    func setVertexTexture(_ texture: MTLTexture?, index: Int) -> Bool {
+        guard let vertexTextureIndex = VertexTextureIndex(rawValue: index) else {
+            return failBinding("Unsupported Metal 4 vertex texture index \(index).")
+        }
+        return setBinding(argumentTables.setVertexTexture(texture, index: vertexTextureIndex))
     }
 
-    func setFragmentTexture(_ texture: MTLTexture?, index: Int) {
-        guard let fragmentTextureIndex = FragmentTextureIndex(rawValue: index) else { return }
-        argumentTables.setFragmentTexture(texture, index: fragmentTextureIndex)
+    func setFragmentTexture(_ texture: MTLTexture?, index: Int) -> Bool {
+        guard let fragmentTextureIndex = FragmentTextureIndex(rawValue: index) else {
+            return failBinding("Unsupported Metal 4 fragment texture index \(index).")
+        }
+        return setBinding(argumentTables.setFragmentTexture(texture, index: fragmentTextureIndex))
     }
 
-    func setFragmentTextures(_ textures: [MTLTexture?], range: Range<Int>) {
+    func setFragmentTextures(_ textures: [MTLTexture?], range: Range<Int>) -> Bool {
+        var didBindAll = true
         for (offset, texture) in textures.enumerated() {
             let index = range.lowerBound + offset
             guard range.contains(index), let fragmentTextureIndex = FragmentTextureIndex(rawValue: index) else {
+                didBindAll = failBinding("Unsupported Metal 4 fragment texture index \(index).")
                 continue
             }
-            argumentTables.setFragmentTexture(texture, index: fragmentTextureIndex)
+            didBindAll = setBinding(argumentTables.setFragmentTexture(texture, index: fragmentTextureIndex)) && didBindAll
         }
+        return didBindAll
     }
 
-    func setFragmentSamplerState(_ samplerState: MTLSamplerState?, index: Int) {
-        guard let fragmentSamplerIndex = FragmentSamplerIndex(rawValue: index) else { return }
-        argumentTables.setFragmentSamplerState(samplerState, index: fragmentSamplerIndex)
+    func setFragmentSamplerState(_ samplerState: MTLSamplerState?, index: Int) -> Bool {
+        guard let fragmentSamplerIndex = FragmentSamplerIndex(rawValue: index) else {
+            return failBinding("Unsupported Metal 4 fragment sampler index \(index).")
+        }
+        return setBinding(argumentTables.setFragmentSamplerState(samplerState, index: fragmentSamplerIndex))
+    }
+
+    private func setBinding(_ didBind: Bool) -> Bool {
+        if didBind {
+            lastBindingFailure = nil
+            return true
+        }
+        return failBinding("Binding is outside Metal 4 argument table limits.")
+    }
+
+    private func failBinding(_ reason: String) -> Bool {
+        lastBindingFailure = reason
+        return false
     }
 
     func useResource(_ resource: MTLResource, usage: MTLResourceUsage, stages: MTLRenderStages) {}

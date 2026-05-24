@@ -27,6 +27,10 @@ public final class RenderEncoderState {
         commands.supportsTessellation
     }
 
+    public var lastBindingFailure: String? {
+        commands.lastBindingFailure
+    }
+
     public var cullMode: MTLCullMode? {
         didSet {
             if oldValue != cullMode, let cullMode {
@@ -93,7 +97,7 @@ public final class RenderEncoderState {
     public var vertexVertexUniforms: VertexUniformBuffer? {
         didSet {
             if oldValue !== vertexVertexUniforms, let vertexVertexUniforms {
-                commands.setVertexBuffer(
+                _ = commands.setVertexBuffer(
                     vertexVertexUniforms.buffer,
                     offset: vertexVertexUniforms.offset,
                     index: VertexBufferIndex.VertexUniforms.rawValue
@@ -105,7 +109,7 @@ public final class RenderEncoderState {
     public var fragmentVertexUniforms: VertexUniformBuffer? {
         didSet {
             if oldValue !== fragmentVertexUniforms, let fragmentVertexUniforms {
-                commands.setFragmentBuffer(
+                _ = commands.setFragmentBuffer(
                     fragmentVertexUniforms.buffer,
                     offset: fragmentVertexUniforms.offset,
                     index: FragmentBufferIndex.VertexUniforms.rawValue
@@ -117,7 +121,7 @@ public final class RenderEncoderState {
     public var vertexMaterialUniforms: UniformBuffer? {
         didSet {
             if oldValue !== vertexMaterialUniforms, let vertexMaterialUniforms {
-                commands.setVertexBuffer(
+                _ = commands.setVertexBuffer(
                     vertexMaterialUniforms.buffer,
                     offset: vertexMaterialUniforms.offset,
                     index: VertexBufferIndex.MaterialUniforms.rawValue
@@ -129,7 +133,7 @@ public final class RenderEncoderState {
     public var vertexInstanceUniforms: InstanceMatrixUniformBuffer? {
         didSet {
             if oldValue !== vertexInstanceUniforms, let vertexInstanceUniforms {
-                commands.setVertexBuffer(
+                _ = commands.setVertexBuffer(
                     vertexInstanceUniforms.buffer,
                     offset: vertexInstanceUniforms.offset,
                     index: VertexBufferIndex.InstanceMatrixUniforms.rawValue
@@ -141,7 +145,7 @@ public final class RenderEncoderState {
     public var fragmentMaterialUniforms: UniformBuffer? {
         didSet {
             if oldValue !== fragmentMaterialUniforms, let fragmentMaterialUniforms {
-                commands.setFragmentBuffer(
+                _ = commands.setFragmentBuffer(
                     fragmentMaterialUniforms.buffer,
                     offset: fragmentMaterialUniforms.offset,
                     index: FragmentBufferIndex.MaterialUniforms.rawValue
@@ -163,8 +167,9 @@ public final class RenderEncoderState {
             return
         }
         else {
-            commands.setVertexBuffer(buffer, offset: offset, index: index.rawValue)
-            vertexBuffers[index] = buffer
+            if commands.setVertexBuffer(buffer, offset: offset, index: index.rawValue) {
+                vertexBuffers[index] = buffer
+            }
         }
     }
 
@@ -173,8 +178,9 @@ public final class RenderEncoderState {
             return
         }
         else {
-            commands.setFragmentBuffer(buffer, offset: offset, index: index.rawValue)
-            fragmentBuffers[index] = buffer
+            if commands.setFragmentBuffer(buffer, offset: offset, index: index.rawValue) {
+                fragmentBuffers[index] = buffer
+            }
         }
     }
 
@@ -183,8 +189,9 @@ public final class RenderEncoderState {
             return
         }
         else {
-            commands.setFragmentTexture(texture, index: type.index)
-            fragmentPBRTextures[type] = texture
+            if commands.setFragmentTexture(texture, index: type.index) {
+                fragmentPBRTextures[type] = texture
+            }
         }
     }
 
@@ -193,8 +200,9 @@ public final class RenderEncoderState {
             return
         }
         else {
-            commands.setVertexTexture(texture, index: index.rawValue)
-            vertexTextures[index] = texture
+            if commands.setVertexTexture(texture, index: index.rawValue) {
+                vertexTextures[index] = texture
+            }
         }
     }
 
@@ -203,17 +211,18 @@ public final class RenderEncoderState {
             return
         }
         else {
-            commands.setFragmentTexture(texture, index: index.rawValue)
-            fragmentTextures[index] = texture
+            if commands.setFragmentTexture(texture, index: index.rawValue) {
+                fragmentTextures[index] = texture
+            }
         }
     }
 
     public func setFragmentTextures(_ textures: [MTLTexture?], startIndex: FragmentTextureIndex) {
         guard !textures.isEmpty else { return }
-        commands.setFragmentTextures(
+        guard commands.setFragmentTextures(
             textures,
             range: startIndex.rawValue..<(startIndex.rawValue + textures.count)
-        )
+        ) else { return }
         for (offset, texture) in textures.enumerated() {
             guard let index = FragmentTextureIndex(rawValue: startIndex.rawValue + offset) else { continue }
             fragmentTextures[index] = texture
@@ -225,8 +234,9 @@ public final class RenderEncoderState {
             return
         }
         else {
-            commands.setFragmentSamplerState(samplerState, index: index.rawValue)
-            fragmentSamplerStates[index] = samplerState
+            if commands.setFragmentSamplerState(samplerState, index: index.rawValue) {
+                fragmentSamplerStates[index] = samplerState
+            }
         }
     }
 

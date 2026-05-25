@@ -4,6 +4,8 @@
 
 Satin now has incremental Metal 4 frame-command support for renderer-owned render, post-process, shadow, and compute paths. `Context(device:backend:...)` accepts `.metal4` and falls back to `.metal3` when Metal 4 command queues are not available.
 
+📖 **See [Documentation/Metal4Backend.md](Documentation/Metal4Backend.md) for the full migration guide, override expectations, known limitations, and perf characteristics.**
+
 Metal 4 render argument tables are pooled per frame slot and render pass, and bound resources are tracked through a per-frame residency set for explicit `gpuAddress` / `gpuResourceID` usage.
 
 Third-party compute subclasses can use the backend-neutral `ComputeArgumentBinding` surface instead of depending on Satin's internal Metal 4 argument-table type:

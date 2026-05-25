@@ -15,6 +15,12 @@ internal final class Metal4ComputeArgumentTable {
     private static let maxBufferIndex = ComputeBufferIndex.TessellationIndices.rawValue
     private static let maxTextureIndex = ComputeTextureIndex.Custom10.rawValue
 
+    // Track which slots were written since last reset using bitsets (single
+    // bitwise-OR per bind, O(used) drain on reset). Matches the optimization in
+    // Metal4ArgumentTables.
+    private var dirtyBuffers: UInt64 = 0
+    private var dirtyTextures: UInt64 = 0
+
     init?(device: MTLDevice, resourceHandler: ((MTLResource) -> Void)? = nil) {
         guard let descriptor = Metal4ArgumentBindingLayout.makeArgumentTableDescriptor(
             label: "Satin Metal 4 Compute Arguments",
@@ -34,13 +40,20 @@ internal final class Metal4ComputeArgumentTable {
         reset()
     }
 
+    @inline(__always)
+    private static func drain(_ mask: inout UInt64, body: (Int) -> Void) {
+        var bits = mask
+        while bits != 0 {
+            let i = bits.trailingZeroBitCount
+            body(i)
+            bits &= bits &- 1
+        }
+        mask = 0
+    }
+
     private func reset() {
-        for index in 0 ... Self.maxBufferIndex {
-            table.setAddress(0, index: index)
-        }
-        for index in 0 ... Self.maxTextureIndex {
-            table.setTexture(Self.nilResourceID, index: index)
-        }
+        Self.drain(&dirtyBuffers) { table.setAddress(0, index: $0) }
+        Self.drain(&dirtyTextures) { table.setTexture(Self.nilResourceID, index: $0) }
     }
 
     func bind(to computeEncoder: any MTL4ComputeCommandEncoder) {
@@ -52,6 +65,7 @@ internal final class Metal4ComputeArgumentTable {
         guard Metal4ArgumentBindingLayout.supportsBufferIndex(index.rawValue) else { return false }
         resourceHandler?(buffer)
         table.setAddress(buffer.gpuAddress + MTLGPUAddress(offset), index: index.rawValue)
+        dirtyBuffers |= 1 << index.rawValue
         return true
     }
 
@@ -60,6 +74,7 @@ internal final class Metal4ComputeArgumentTable {
         guard Metal4ArgumentBindingLayout.supportsBufferIndex(index) else { return false }
         resourceHandler?(buffer)
         table.setAddress(buffer.gpuAddress + MTLGPUAddress(offset), index: index)
+        dirtyBuffers |= 1 << index
         return true
     }
 
@@ -69,6 +84,7 @@ internal final class Metal4ComputeArgumentTable {
         guard let texture else { return true }
         resourceHandler?(texture)
         table.setTexture(texture.gpuResourceID, index: index.rawValue)
+        dirtyTextures |= 1 << index.rawValue
         return true
     }
 
@@ -78,6 +94,7 @@ internal final class Metal4ComputeArgumentTable {
         guard let texture else { return true }
         resourceHandler?(texture)
         table.setTexture(texture.gpuResourceID, index: index)
+        dirtyTextures |= 1 << index
         return true
     }
 }

@@ -73,4 +73,36 @@ final class Metal4RenderPassBridgeTests: XCTestCase {
         XCTAssertEqual(metal4Descriptor.colorAttachments[0].loadAction, .clear)
         XCTAssertEqual(metal4Descriptor.depthAttachment.clearDepth, 0.5)
     }
+
+    func testMetal4RenderPassBridgeCopiesCustomSamplePositions() throws {
+        guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) else {
+            throw XCTSkip("Metal 4 render pass descriptors require OS 26 SDK runtime support.")
+        }
+
+        let descriptor = MTLRenderPassDescriptor()
+        let positions: [MTLSamplePosition] = [
+            MTLSamplePosition(x: 0.25, y: 0.25),
+            MTLSamplePosition(x: 0.75, y: 0.25),
+            MTLSamplePosition(x: 0.25, y: 0.75),
+            MTLSamplePosition(x: 0.75, y: 0.75)
+        ]
+        descriptor.setSamplePositions(positions)
+
+        let metal4Descriptor = Metal4RenderPassBridge.makeDescriptor(from: descriptor)
+        XCTAssertEqual(metal4Descriptor.samplePositions.count, positions.count)
+        for (forwarded, original) in zip(metal4Descriptor.samplePositions, positions) {
+            XCTAssertEqual(forwarded.x, original.x)
+            XCTAssertEqual(forwarded.y, original.y)
+        }
+    }
+
+    func testMetal4RenderPassBridgeLeavesSamplePositionsEmptyWhenUnset() throws {
+        guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) else {
+            throw XCTSkip("Metal 4 render pass descriptors require OS 26 SDK runtime support.")
+        }
+
+        let descriptor = MTLRenderPassDescriptor()
+        let metal4Descriptor = Metal4RenderPassBridge.makeDescriptor(from: descriptor)
+        XCTAssertTrue(metal4Descriptor.samplePositions.isEmpty)
+    }
 }

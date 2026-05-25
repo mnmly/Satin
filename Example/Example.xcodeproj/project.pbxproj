@@ -17,6 +17,8 @@
 		D2B200122F9A000100AAA001 /* SSGIProjectorRendererView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2B200022F9A000100AAA001 /* SSGIProjectorRendererView.swift */; };
 		D2B200212F9A000100AAA001 /* SSGICornellBoxRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2B200202F9A000100AAA001 /* SSGICornellBoxRenderer.swift */; };
 		D2B200222F9A000100AAA001 /* SSGICornellBoxRendererView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2B200202F9A000100AAA002 /* SSGICornellBoxRendererView.swift */; };
+		F04E00012FA4000100AAA001 /* Metal4BackendRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F04E00032FA4000100AAA001 /* Metal4BackendRenderer.swift */; };
+		F04E00022FA4000100AAA001 /* Metal4BackendRendererView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F04E00042FA4000100AAA001 /* Metal4BackendRendererView.swift */; };
 		E102D07E2C8A129700DD255C /* ImmersiveBaseRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E102D07D2C8A129700DD255C /* ImmersiveBaseRenderer.swift */; };
 		E103E0532B5DDEDF0017588F /* VisionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E103E0522B5DDEDF0017588F /* VisionsView.swift */; };
 		E103E0DC2B5F41570017588F /* Renderer3D.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F1B32724BAA93300563923 /* Renderer3D.swift */; };
@@ -407,6 +409,8 @@
 		F0A300012E05000200AAA002 /* ProjectorRendererView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectorRendererView.swift; sourceTree = "<group>"; };
 		F0B200012E06000200AAA001 /* SlugTextRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlugTextRenderer.swift; sourceTree = "<group>"; };
 		F0B200012E06000200AAA002 /* SlugTextRendererView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlugTextRendererView.swift; sourceTree = "<group>"; };
+		F04E00032FA4000100AAA001 /* Metal4BackendRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metal4BackendRenderer.swift; sourceTree = "<group>"; };
+		F04E00042FA4000100AAA001 /* Metal4BackendRendererView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metal4BackendRendererView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -591,6 +595,7 @@
 			children = (
 				E1E767C128A6D341005D75AB /* Renderer2DView.swift */,
 				E1E767BE28A6D2A2005D75AB /* Renderer3DView.swift */,
+				F04E00042FA4000100AAA001 /* Metal4BackendRendererView.swift */,
 				E13687292900BEEC00FFF43F /* InstancedMeshRendererView.swift */,
 				E1E767C528A6D41B005D75AB /* CameraControllerRendererView.swift */,
 				E1DDD3562C2FA6DF00012A44 /* OrbitCameraControllerRendererView.swift */,
@@ -708,6 +713,7 @@
 				E13687272900BBEC00FFF43F /* InstancedMeshRenderer.swift */,
 				E17B986E2451488100216411 /* Renderer2D.swift */,
 				E1F1B32724BAA93300563923 /* Renderer3D.swift */,
+				F04E00032FA4000100AAA001 /* Metal4BackendRenderer.swift */,
 				E144FA2D24D0D5550072D456 /* CameraControllerRenderer.swift */,
 				E1DDD3542C2FA6B400012A44 /* OrbitCameraControllerRenderer.swift */,
 			);
@@ -1065,6 +1071,7 @@
 				E103E12F2B603ED30017588F /* LoadObjRenderer.swift in Sources */,
 				E1903C0F2B6046B4004AB175 /* ARPlaneRendererView.swift in Sources */,
 				E103E0DC2B5F41570017588F /* Renderer3D.swift in Sources */,
+				F04E00012FA4000100AAA001 /* Metal4BackendRenderer.swift in Sources */,
 				E103E1322B603F940017588F /* CustomGeometryRenderer.swift in Sources */,
 				E1D43BEF2C6AA55C0063E2C9 /* WaveSimulationRendererView.swift in Sources */,
 				E103E12A2B603ECD0017588F /* SuperShapesRendererView.swift in Sources */,
@@ -1198,6 +1205,7 @@
 				E103E1402B603FCA0017588F /* PBRRendererView.swift in Sources */,
 				E152372829CBDF4E00D96D46 /* ObjectShadowRenderer.swift in Sources */,
 				E103E0FD2B5F476A0017588F /* Renderer3DView.swift in Sources */,
+				F04E00022FA4000100AAA001 /* Metal4BackendRendererView.swift in Sources */,
 				E17A55BD28A6C9C6008F1DDB /* IcosahedronGenerator.c in Sources */,
 				E11D04E22C605421003BDC36 /* MultipleContextRendererView.swift in Sources */,
 				E103E1242B603E760017588F /* CubemapRenderer.swift in Sources */,

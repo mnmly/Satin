@@ -83,6 +83,7 @@ struct ContentView: View {
                 items: [
                     ExampleItem(id: "2d", title: "2D", systemImage: "square") { Renderer2DView() },
                     ExampleItem(id: "3d", title: "3D", systemImage: "cube") { Renderer3DView() },
+                    ExampleItem(id: "metal4-backend", title: "Metal 4 Backend", systemImage: "bolt.horizontal.circle") { Metal4BackendRendererView() },
                     ExampleItem(id: "instanced-mesh", title: "Instanced Mesh", systemImage: "circle.grid.2x2.fill") { InstancedMeshRendererView() },
                     ExampleItem(id: "camera-controller", title: "Camera Controller", systemImage: "camera.aperture") { CameraControllerRendererView() },
                     ExampleItem(id: "orbit-camera-controller", title: "Orbit Camera Controller", systemImage: "rotate.3d.circle") { OrbitCameraControllerRendererView() }

@@ -118,6 +118,7 @@ final class GeometryCoverageTests: XCTestCase {
         try assertLitGeometry(
             reference: "geometry-parametric",
             geometry: { context in
+                
                 ParametricGeometry(context: context, rangeU: 0.0 ... 1.0, rangeV: 0.0 ... 1.0, resolution: simd_int2(24, 18)) { u, v in
                     simd_float3(
                         (u - 0.5) * 1.35,

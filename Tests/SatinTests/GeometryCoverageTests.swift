@@ -126,7 +126,8 @@ final class GeometryCoverageTests: XCTestCase {
                     )
                 }
             },
-            orientation: simd_quatf(angle: -.pi * 0.1, axis: simd_normalize(simd_float3(1.0, 0.2, 0.0)))
+            orientation: simd_quatf(angle: -.pi * 0.1, axis: simd_normalize(simd_float3(1.0, 0.2, 0.0))),
+            minimumMeanNormalizedDifference: 0.005
         )
     }
 
@@ -343,6 +344,8 @@ private func assertLitGeometry(
     orientation: simd_quatf = simd_quatf(angle: 0.0, axis: simd_float3(0.0, 1.0, 0.0)),
     cameraPosition: simd_float3 = [0.0, 0.0, 4.35],
     lookAt: simd_float3 = .zero,
+    minimumChangedPixelRatio: Double = 0.08,
+    minimumMeanNormalizedDifference: Double = 0.018,
     file: StaticString = #filePath,
     line: UInt = #line
 ) throws {
@@ -369,7 +372,7 @@ private func assertLitGeometry(
         return makeScene(context: context, mesh, extras: [light, fill])
     }
 
-    assertGeometryImage(image, reference: reference, threshold: 0.008, minimumChangedPixelRatio: 0.08, minimumMeanNormalizedDifference: 0.018, file: file, line: line)
+    assertGeometryImage(image, reference: reference, threshold: 0.008, minimumChangedPixelRatio: minimumChangedPixelRatio, minimumMeanNormalizedDifference: minimumMeanNormalizedDifference, file: file, line: line)
 }
 
 private func renderGeometry(

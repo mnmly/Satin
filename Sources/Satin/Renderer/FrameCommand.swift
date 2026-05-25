@@ -111,6 +111,10 @@ internal final class Metal4FrameCommand: SatinCommittableFrameCommand {
         argumentTablePool.makeRenderArgumentTables(frameSlot: frameSlot, resourceHandler: useResource)
     }
 
+    func makeComputeArgumentTable() -> Metal4ComputeArgumentTable? {
+        argumentTablePool.makeComputeArgumentTable(frameSlot: frameSlot, resourceHandler: useResource)
+    }
+
     /// Arrange for the Metal 4 queue to signal `event` with `value` after the
     /// partial buffer commits. Pair with `encodeWaitForEvent` on the Metal 3
     /// fallback buffer so the GPU does not race the two queues on the drawable.

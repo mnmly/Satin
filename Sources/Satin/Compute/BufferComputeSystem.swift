@@ -118,7 +118,7 @@ open class BufferComputeSystem: ComputeSystem {
         guard count > 0,
               bufferMap.count > 0,
               let computeEncoder = frameCommand.commandBuffer.makeComputeCommandEncoder(),
-              let argumentTable = Metal4ComputeArgumentTable(device: device, resourceHandler: frameCommand.useResource)
+              let argumentTable = frameCommand.makeComputeArgumentTable()
         else { return false }
 
         computeEncoder.label = label

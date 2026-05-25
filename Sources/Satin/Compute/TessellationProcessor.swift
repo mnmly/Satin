@@ -107,7 +107,7 @@ open class TessellationProcessor<T>: ComputeProcessor, Tessellator {
         guard (_reset && resetPipeline != nil) || updatePipeline != nil else { return true }
         guard factorsBuffer != nil,
               let computeEncoder = frameCommand.commandBuffer.makeComputeCommandEncoder(),
-              let argumentTable = Metal4ComputeArgumentTable(device: device, resourceHandler: frameCommand.useResource)
+              let argumentTable = frameCommand.makeComputeArgumentTable()
         else { return false }
 
         computeEncoder.label = label

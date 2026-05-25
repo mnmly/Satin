@@ -122,16 +122,24 @@ internal final class Metal4ArgumentTablePool {
     private let device: MTLDevice
     private var renderTables: [[Metal4ArgumentTables]]
     private var renderCursors: [Int]
+    private var computeTables: [[Metal4ComputeArgumentTable]]
+    private var computeCursors: [Int]
 
     init(device: MTLDevice, frameSlotCount: Int) {
         self.device = device
         self.renderTables = Array(repeating: [], count: frameSlotCount)
         self.renderCursors = Array(repeating: 0, count: frameSlotCount)
+        self.computeTables = Array(repeating: [], count: frameSlotCount)
+        self.computeCursors = Array(repeating: 0, count: frameSlotCount)
     }
 
     func reset(frameSlot: Int) {
-        guard renderCursors.indices.contains(frameSlot) else { return }
-        renderCursors[frameSlot] = 0
+        if renderCursors.indices.contains(frameSlot) {
+            renderCursors[frameSlot] = 0
+        }
+        if computeCursors.indices.contains(frameSlot) {
+            computeCursors[frameSlot] = 0
+        }
     }
 
     func makeRenderArgumentTables(frameSlot: Int, resourceHandler: @escaping (MTLResource) -> Void) -> Metal4ArgumentTables? {
@@ -150,5 +158,23 @@ internal final class Metal4ArgumentTablePool {
         }
         renderTables[frameSlot].append(tables)
         return tables
+    }
+
+    func makeComputeArgumentTable(frameSlot: Int, resourceHandler: @escaping (MTLResource) -> Void) -> Metal4ComputeArgumentTable? {
+        guard computeTables.indices.contains(frameSlot) else { return nil }
+        let cursor = computeCursors[frameSlot]
+        computeCursors[frameSlot] += 1
+
+        if computeTables[frameSlot].indices.contains(cursor) {
+            let table = computeTables[frameSlot][cursor]
+            table.prepareForReuse(resourceHandler: resourceHandler)
+            return table
+        }
+
+        guard let table = Metal4ComputeArgumentTable(device: device, resourceHandler: resourceHandler) else {
+            return nil
+        }
+        computeTables[frameSlot].append(table)
+        return table
     }
 }

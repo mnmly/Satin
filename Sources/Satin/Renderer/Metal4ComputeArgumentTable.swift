@@ -10,13 +10,16 @@ import Metal
 @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
 internal final class Metal4ComputeArgumentTable {
     let table: any MTL4ArgumentTable
-    private let resourceHandler: ((MTLResource) -> Void)?
+    private var resourceHandler: ((MTLResource) -> Void)?
+    private static let nilResourceID = MTLResourceID(_impl: 0)
+    private static let maxBufferIndex = ComputeBufferIndex.TessellationIndices.rawValue
+    private static let maxTextureIndex = ComputeTextureIndex.Custom10.rawValue
 
     init?(device: MTLDevice, resourceHandler: ((MTLResource) -> Void)? = nil) {
         guard let descriptor = Metal4ArgumentBindingLayout.makeArgumentTableDescriptor(
             label: "Satin Metal 4 Compute Arguments",
-            maxBufferBindCount: ComputeBufferIndex.TessellationIndices.rawValue + 1,
-            maxTextureBindCount: ComputeTextureIndex.Custom10.rawValue + 1,
+            maxBufferBindCount: Self.maxBufferIndex + 1,
+            maxTextureBindCount: Self.maxTextureIndex + 1,
             maxSamplerStateBindCount: 0
         ),
         let table = try? device.makeArgumentTable(descriptor: descriptor)
@@ -24,6 +27,20 @@ internal final class Metal4ComputeArgumentTable {
 
         self.table = table
         self.resourceHandler = resourceHandler
+    }
+
+    func prepareForReuse(resourceHandler: ((MTLResource) -> Void)?) {
+        self.resourceHandler = resourceHandler
+        reset()
+    }
+
+    private func reset() {
+        for index in 0 ... Self.maxBufferIndex {
+            table.setAddress(0, index: index)
+        }
+        for index in 0 ... Self.maxTextureIndex {
+            table.setTexture(Self.nilResourceID, index: index)
+        }
     }
 
     func bind(to computeEncoder: any MTL4ComputeCommandEncoder) {

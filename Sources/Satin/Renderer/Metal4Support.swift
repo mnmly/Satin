@@ -13,6 +13,11 @@ internal final class Metal4Support {
     let commandBuffer: any MTL4CommandBuffer
     let commandAllocators: [any MTL4CommandAllocator]
     let residencySets: [any MTLResidencySet]
+    // Shared event used to fence the Metal 4 partial buffer in front of any
+    // Metal 3 fallback work submitted on the classic queue, so the two GPU
+    // queues do not race on the drawable texture.
+    let fallbackEvent: any MTLSharedEvent
+    private var fallbackEventCounter: UInt64 = 0
     private let argumentTablePool: Metal4ArgumentTablePool
     // Per-slot completion gates. begin() on a slot waits here; the commit feedback
     // handler signals here. This makes "allocator reset only after GPU completion"
@@ -21,8 +26,10 @@ internal final class Metal4Support {
 
     init?(device: MTLDevice, maxBuffersInFlight: Int) {
         guard let commandQueue = device.makeMTL4CommandQueue(),
-              let commandBuffer = device.makeCommandBuffer()
+              let commandBuffer = device.makeCommandBuffer(),
+              let fallbackEvent = device.makeSharedEvent()
         else { return nil }
+        fallbackEvent.label = "Satin Metal 4 Fallback Event"
 
         var commandAllocators = [any MTL4CommandAllocator]()
         commandAllocators.reserveCapacity(maxBuffersInFlight)
@@ -53,8 +60,18 @@ internal final class Metal4Support {
         self.commandBuffer = commandBuffer
         self.commandAllocators = commandAllocators
         self.residencySets = residencySets
+        self.fallbackEvent = fallbackEvent
         self.argumentTablePool = Metal4ArgumentTablePool(device: device, frameSlotCount: maxBuffersInFlight)
         self.slotCompletionSemaphores = (0 ..< maxBuffersInFlight).map { _ in DispatchSemaphore(value: 1) }
+    }
+
+    /// Reserve the next fallback event value and return it together with the shared
+    /// event. The Metal 3 fallback command buffer should `encodeWaitForEvent` on
+    /// the returned value before encoding any work, and the Metal 4 frame command
+    /// must signal that value after committing its partial buffer.
+    func reserveFallbackEventValue() -> (event: any MTLSharedEvent, value: UInt64) {
+        fallbackEventCounter += 1
+        return (fallbackEvent, fallbackEventCounter)
     }
 
     func makeFrameCommand(frameIndex: Int) -> Metal4FrameCommand? {

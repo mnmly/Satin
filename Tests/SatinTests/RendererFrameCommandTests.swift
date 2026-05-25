@@ -188,11 +188,18 @@ final class RendererFrameCommandTests: XCTestCase {
 
         XCTAssertEqual(renderer.commandBufferDrawCount, 1)
 
+        let support = try XCTUnwrap(context.metal4Support)
+        let signaledValueBefore = support.fallbackEvent.signaledValue
+
         renderer.commitFrameCommand(frameCommand)
         fallbackCommandBuffer.commit()
         fallbackCommandBuffer.waitUntilCompleted()
 
         XCTAssertEqual(fallbackCommandBuffer.status, .completed)
+        // The Metal 3 fallback buffer waits on the event before any work runs,
+        // so by the time it completes the Metal 4 partial buffer must have
+        // signalled. The event's signaledValue should have advanced.
+        XCTAssertGreaterThan(support.fallbackEvent.signaledValue, signaledValueBefore)
     }
 
     func testMetal4FrameCommandDrawSupportsVertexAmplification() throws {

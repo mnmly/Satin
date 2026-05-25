@@ -187,6 +187,19 @@ open class Renderer {
               let commandBuffer = commandQueue.makeCommandBuffer()
         else { return nil }
 
+        // Fence the fallback render so the Metal 3 queue waits for the Metal 4
+        // partial buffer to finish before touching the drawable. Both buffers
+        // can write to the same texture, and the two queues do not hazard-track
+        // against each other.
+        if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
+           let failedFrameCommand = failedFrameCommand as? Metal4FrameCommand,
+           let metal4Support = context.metal4Support
+        {
+            let reservation = metal4Support.reserveFallbackEventValue()
+            commandBuffer.encodeWaitForEvent(reservation.event, value: reservation.value)
+            failedFrameCommand.scheduleFallbackSignal(event: reservation.event, value: reservation.value)
+        }
+
         draw(texture: texture, commandBuffer: commandBuffer)
         return commandBuffer
     }

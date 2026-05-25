@@ -59,6 +59,7 @@ internal final class Metal4FrameCommand: SatinCommittableFrameCommand {
     private var isEncoding = false
     private var residencyNeedsCommit = false
     private var didSignalSlotCompletion = false
+    private var pendingFallbackSignal: (event: any MTLSharedEvent, value: UInt64)?
 
     init(
         frameIndex: Int,
@@ -110,6 +111,13 @@ internal final class Metal4FrameCommand: SatinCommittableFrameCommand {
         argumentTablePool.makeRenderArgumentTables(frameSlot: frameSlot, resourceHandler: useResource)
     }
 
+    /// Arrange for the Metal 4 queue to signal `event` with `value` after the
+    /// partial buffer commits. Pair with `encodeWaitForEvent` on the Metal 3
+    /// fallback buffer so the GPU does not race the two queues on the drawable.
+    func scheduleFallbackSignal(event: any MTLSharedEvent, value: UInt64) {
+        pendingFallbackSignal = (event, value)
+    }
+
     func end() {
         guard isEncoding else { return }
         if residencyNeedsCommit {
@@ -139,5 +147,9 @@ internal final class Metal4FrameCommand: SatinCommittableFrameCommand {
             onCompleted?()
         }
         commandQueue.commit([commandBuffer], options: options)
+        if let pendingFallbackSignal {
+            commandQueue.signalEvent(pendingFallbackSignal.event, value: pendingFallbackSignal.value)
+            self.pendingFallbackSignal = nil
+        }
     }
 }

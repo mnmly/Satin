@@ -92,6 +92,10 @@ public struct Context {
         guard requestedBackend == .metal4 else { return nil }
 
         if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
+            // Metal 4 features (argument tables, command allocators, residency sets)
+            // require MTLGPUFamily.metal4 — Apple7+ silicon, no Intel / AMD.
+            // See Reference/Documentations/Metal-Feature-Set-Tables.pdf p.5.
+            guard device.supportsFamily(.metal4) else { return nil }
             return Metal4Support(device: device, maxBuffersInFlight: maxBuffersInFlight)
         }
 

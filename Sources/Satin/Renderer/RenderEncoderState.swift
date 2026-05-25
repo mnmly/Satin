@@ -248,6 +248,34 @@ public final class RenderEncoderState {
         commands.failEncoding(reason)
     }
 
+    public func setLabel(_ label: String) {
+        commands.setLabel(label)
+    }
+
+    public func pushDebugGroup(_ label: String) {
+        commands.pushDebugGroup(label)
+    }
+
+    public func popDebugGroup() {
+        commands.popDebugGroup()
+    }
+
+    public func endEncoding() {
+        commands.endEncoding()
+    }
+
+    public func setViewports(_ viewports: [MTLViewport]) {
+        commands.setViewports(viewports)
+    }
+
+    public func setVertexAmplification(count: Int, viewMappings: [MTLVertexAmplificationViewMapping]) {
+        commands.setVertexAmplification(count: count, viewMappings: viewMappings)
+    }
+
+    public func dispatchThreadsPerTile(_ threadsPerTile: MTLSize) {
+        commands.dispatchThreadsPerTile(threadsPerTile)
+    }
+
     public func drawPrimitives(type: MTLPrimitiveType, vertexStart: Int, vertexCount: Int, instanceCount: Int) {
         commands.drawPrimitives(
             type: type,

@@ -11,6 +11,14 @@ internal protocol SatinRenderCommandEncoder {
     var supportsTessellation: Bool { get }
     var lastBindingFailure: String? { get }
 
+    func setLabel(_ label: String)
+    func pushDebugGroup(_ label: String)
+    func popDebugGroup()
+    func endEncoding()
+    func setViewports(_ viewports: [MTLViewport])
+    func setVertexAmplification(count: Int, viewMappings: [MTLVertexAmplificationViewMapping])
+    func dispatchThreadsPerTile(_ threadsPerTile: MTLSize)
+
     func setCullMode(_ cullMode: MTLCullMode)
     func setFrontFacing(_ windingOrder: MTLWinding)
     func setTriangleFillMode(_ triangleFillMode: MTLTriangleFillMode)
@@ -72,6 +80,36 @@ internal final class MetalRenderCommandEncoder: SatinRenderCommandEncoder {
 
     init(renderEncoder: MTLRenderCommandEncoder) {
         self.renderEncoder = renderEncoder
+    }
+
+    func setLabel(_ label: String) {
+        renderEncoder.label = label
+    }
+
+    func pushDebugGroup(_ label: String) {
+        renderEncoder.pushDebugGroup(label)
+    }
+
+    func popDebugGroup() {
+        renderEncoder.popDebugGroup()
+    }
+
+    func endEncoding() {
+        renderEncoder.endEncoding()
+    }
+
+    func setViewports(_ viewports: [MTLViewport]) {
+        renderEncoder.setViewports(viewports)
+    }
+
+    func setVertexAmplification(count: Int, viewMappings: [MTLVertexAmplificationViewMapping]) {
+        guard count > 1 else { return }
+        var maps = viewMappings
+        renderEncoder.setVertexAmplificationCount(count, viewMappings: &maps)
+    }
+
+    func dispatchThreadsPerTile(_ threadsPerTile: MTLSize) {
+        renderEncoder.dispatchThreadsPerTile(threadsPerTile)
     }
 
     func setCullMode(_ cullMode: MTLCullMode) {
@@ -230,6 +268,35 @@ internal final class Metal4RenderCommandEncoder: SatinRenderCommandEncoder {
         self.renderEncoder = renderEncoder
         self.argumentTables = argumentTables
         argumentTables.bind(to: renderEncoder)
+    }
+
+    func setLabel(_ label: String) {
+        renderEncoder.label = label
+    }
+
+    func pushDebugGroup(_ label: String) {
+        renderEncoder.pushDebugGroup(label)
+    }
+
+    func popDebugGroup() {
+        renderEncoder.popDebugGroup()
+    }
+
+    func endEncoding() {
+        renderEncoder.endEncoding()
+    }
+
+    func setViewports(_ viewports: [MTLViewport]) {
+        renderEncoder.setViewports(viewports)
+    }
+
+    func setVertexAmplification(count: Int, viewMappings: [MTLVertexAmplificationViewMapping]) {
+        guard count > 1 else { return }
+        renderEncoder.setVertexAmplificationCount(viewMappings)
+    }
+
+    func dispatchThreadsPerTile(_ threadsPerTile: MTLSize) {
+        renderEncoder.dispatchThreadsPerTile(threadsPerTile)
     }
 
     func setCullMode(_ cullMode: MTLCullMode) {

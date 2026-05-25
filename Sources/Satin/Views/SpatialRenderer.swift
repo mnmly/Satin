@@ -48,13 +48,22 @@ open class SpatialRenderer: Renderer, CompositorLayerConfiguration {
     var onDisappearAction: (() -> Void)?
 
     open override func makeDefaultContext() -> Context {
-        Context(
+        // When the caller requests the Metal 4 backend, route everything through
+        // the compositor's MTL4 command queue so cp_drawable_mtl4_encode_present
+        // observes the work we commit. Falls back to the standard MTL3 queue when
+        // either the backend is .metal3 or visionOS predates 26.
+        var externalQueue: Any? = nil
+        if context.requestedBackend == .metal4, #available(visionOS 26.0, *) {
+            externalQueue = layerRenderer.commandQueue
+        }
+        return Context(
             device: device,
-            backend: .metal3,
+            backend: context.requestedBackend,
             sampleCount: sampleCount,
             colorPixelFormat: colorPixelFormat,
             depthPixelFormat: depthPixelFormat,
-            vertexAmplificationCount: layerRenderer.configuration.layout == .layered ? 2 : 1
+            vertexAmplificationCount: layerRenderer.configuration.layout == .layered ? 2 : 1,
+            externalMetal4CommandQueue: externalQueue
         )
     }
 
@@ -157,6 +166,7 @@ open class SpatialRenderer: Renderer, CompositorLayerConfiguration {
             drawable: drawable,
             commandBuffer: commandBuffer,
             cameras: updateCameras(
+                context: context,
                 drawable: drawable,
                 deviceAnchor: deviceAnchor?.originFromAnchorTransform ?? matrix_identity_float4x4
             )
@@ -276,11 +286,164 @@ open class SpatialRenderer: Renderer, CompositorLayerConfiguration {
 
         LayerRenderer.Clock().wait(until: timing.optimalInputTime)
 
-        guard let (drawable, commandBuffer, cameras) = preDraw(frame: frame) else { return }
+        if defaultContext.backend == .metal4, #available(visionOS 26.0, *) {
+            guard let (drawable, frameCommand, cameras) = preDrawMetal4(frame: frame) else { return }
+            draw(frame: frame, drawable: drawable, frameCommand: frameCommand, cameras: cameras)
+            postDraw(frame: frame, drawable: drawable, frameCommand: frameCommand)
+        } else {
+            guard let (drawable, commandBuffer, cameras) = preDraw(frame: frame) else { return }
+            draw(frame: frame, drawable: drawable, commandBuffer: commandBuffer, cameras: cameras)
+            postDraw(frame: frame, drawable: drawable, commandBuffer: commandBuffer)
+        }
+    }
 
-        draw(frame: frame, drawable: drawable, commandBuffer: commandBuffer, cameras: cameras)
+    // MARK: - Metal 4 frame-command path
 
-        postDraw(frame: frame, drawable: drawable, commandBuffer: commandBuffer)
+    @available(visionOS 26.0, *)
+    open func drawView(
+        view: Int,
+        frame: LayerRenderer.Frame,
+        renderPassDescriptor: MTLRenderPassDescriptor,
+        frameCommand: any SatinFrameCommand,
+        camera: PerspectiveCamera,
+        viewport: MTLViewport
+    ) {}
+
+    @available(visionOS 26.0, *)
+    open func draw(
+        frame: LayerRenderer.Frame,
+        renderPassDescriptor: MTLRenderPassDescriptor,
+        frameCommand: any SatinFrameCommand,
+        cameras: [PerspectiveCamera],
+        viewports: [MTLViewport],
+        viewMappings: [MTLVertexAmplificationViewMapping]
+    ) {}
+
+    @available(visionOS 26.0, *)
+    open func preDrawMetal4(frame: LayerRenderer.Frame) -> (drawable: LayerRenderer.Drawable, frameCommand: any SatinFrameCommand, cameras: [PerspectiveCamera])? {
+        guard let frameCommand = makeFrameCommand() else {
+            fatalError("Failed to create frame command")
+        }
+        guard let drawable = frame.queryDrawable() else { return nil }
+
+        frame.startSubmission()
+
+        let time = LayerRenderer.Clock.Instant.epoch.duration(to: drawable.frameTiming.presentationTime).timeInterval
+        let deviceAnchor = worldTracking.queryDeviceAnchor(atTimestamp: time)
+        drawable.deviceAnchor = deviceAnchor
+
+        return (
+            drawable: drawable,
+            frameCommand: frameCommand,
+            cameras: updateCameras(
+                context: defaultContext,
+                drawable: drawable,
+                deviceAnchor: deviceAnchor?.originFromAnchorTransform ?? matrix_identity_float4x4
+            )
+        )
+    }
+
+    @available(visionOS 26.0, *)
+    open func draw(
+        frame: LayerRenderer.Frame,
+        drawable: LayerRenderer.Drawable,
+        frameCommand: any SatinFrameCommand,
+        cameras: [PerspectiveCamera]
+    ) {
+        if layerRenderer.configuration.layout == .dedicated {
+            let indexOffset = (frameIndex % maxBuffersInFlight) * 2
+            for i in 0 ..< drawable.views.count {
+                let renderPassDescriptor = MTLRenderPassDescriptor()
+                if sampleCount > 1 {
+                    renderPassDescriptor.colorAttachments[0].texture = getMultisampleColorTexture(
+                        ref: drawable.colorTextures[i],
+                        index: i + indexOffset
+                    )
+                    renderPassDescriptor.colorAttachments[0].resolveTexture = drawable.colorTextures[i]
+
+                    renderPassDescriptor.depthAttachment.texture = getMultisampleDepthTexture(
+                        ref: drawable.depthTextures[i],
+                        index: i + indexOffset
+                    )
+                    renderPassDescriptor.depthAttachment.resolveTexture = drawable.depthTextures[i]
+                } else {
+                    renderPassDescriptor.colorAttachments[0].texture = drawable.colorTextures[i]
+                    renderPassDescriptor.depthAttachment.texture = drawable.depthTextures[i]
+                }
+
+                if layerRenderer.configuration.isFoveationEnabled {
+#if targetEnvironment(simulator)
+                    renderPassDescriptor.rasterizationRateMap = drawable.rasterizationRateMaps.first
+#else
+                    renderPassDescriptor.rasterizationRateMap = drawable.rasterizationRateMaps[i]
+#endif
+                }
+
+                drawView(
+                    view: i,
+                    frame: frame,
+                    renderPassDescriptor: renderPassDescriptor,
+                    frameCommand: frameCommand,
+                    camera: cameras[i],
+                    viewport: drawable.views[i].textureMap.viewport
+                )
+            }
+        } else {
+            let renderPassDescriptor = MTLRenderPassDescriptor()
+
+            if sampleCount > 1 {
+                let indexOffset = frameIndex % maxBuffersInFlight
+                renderPassDescriptor.colorAttachments[0].texture = getMultisampleColorTexture(
+                    ref: drawable.colorTextures[0],
+                    index: indexOffset
+                )
+                renderPassDescriptor.colorAttachments[0].resolveTexture = drawable.colorTextures[0]
+
+                renderPassDescriptor.depthAttachment.texture = getMultisampleDepthTexture(
+                    ref: drawable.depthTextures[0],
+                    index: indexOffset
+                )
+                renderPassDescriptor.depthAttachment.resolveTexture = drawable.depthTextures[0]
+            } else {
+                renderPassDescriptor.colorAttachments[0].texture = drawable.colorTextures[0]
+                renderPassDescriptor.depthAttachment.texture = drawable.depthTextures[0]
+            }
+
+            renderPassDescriptor.rasterizationRateMap = drawable.rasterizationRateMaps.first
+            renderPassDescriptor.renderTargetArrayLength = drawable.views.count
+
+            var viewports = [MTLViewport]()
+            var viewMappings = [MTLVertexAmplificationViewMapping]()
+
+            for (index, view) in drawable.views.enumerated() {
+                viewports.append(view.textureMap.viewport)
+                viewMappings.append(
+                    MTLVertexAmplificationViewMapping(
+                        viewportArrayIndexOffset: UInt32(index),
+                        renderTargetArrayIndexOffset: UInt32(view.textureMap.sliceIndex)
+                    )
+                )
+            }
+
+            draw(
+                frame: frame,
+                renderPassDescriptor: renderPassDescriptor,
+                frameCommand: frameCommand,
+                cameras: cameras,
+                viewports: viewports,
+                viewMappings: viewMappings
+            )
+        }
+    }
+
+    @available(visionOS 26.0, *)
+    open func postDraw(frame: LayerRenderer.Frame, drawable: LayerRenderer.Drawable, frameCommand: any SatinFrameCommand) {
+        // Commit our work to the compositor's MTL4 queue, then signal the drawable.
+        // The slot-completion handler is wired by makeFrameCommand → commitFrameCommand
+        // so the in-flight semaphore releases when the GPU is done.
+        commitFrameCommand(frameCommand)
+        drawable.encodePresent()
+        frame.endSubmission()
     }
 
     open override func getMultisampleColorTexture(ref: MTLTexture, index: Int) -> MTLTexture? {
@@ -370,7 +533,7 @@ open class SpatialRenderer: Renderer, CompositorLayerConfiguration {
     }
 }
 
-fileprivate func updateCameras(drawable: LayerRenderer.Drawable, deviceAnchor: simd_float4x4) -> [PerspectiveCamera] {
+fileprivate func updateCameras(context: Context, drawable: LayerRenderer.Drawable, deviceAnchor: simd_float4x4) -> [PerspectiveCamera] {
     var cameras = [PerspectiveCamera]()
 
     for i in 0 ..< drawable.views.count {
@@ -380,7 +543,7 @@ fileprivate func updateCameras(drawable: LayerRenderer.Drawable, deviceAnchor: s
             forViewIndex: i
         )
 
-        let camera = PerspectiveCamera()
+        let camera = PerspectiveCamera(context: context)
 
         camera.viewMatrix = info.view
         camera.updateViewMatrix = false

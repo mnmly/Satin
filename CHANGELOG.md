@@ -17,10 +17,25 @@ Third-party compute subclasses can use the backend-neutral `ComputeArgumentBindi
 
 Legacy `MTLComputeCommandEncoder` hooks remain available for Metal 3 paths.
 
+`SpatialRenderer` now supports the Metal 4 backend on visionOS 26+ via the new
+`cp_layer_renderer_get_mtl4_command_queue` and `cp_drawable_t.encodePresent(self:)`
+compositor APIs. Pass `backend: .metal4` to the Satin `Context` and Satin will
+route frame commands through the layer renderer's MTL4 queue. Parallel
+`preDrawMetal4`, `draw(frame:drawable:frameCommand:cameras:)`,
+`postDraw(...frameCommand:)`, and `drawView(...frameCommand:)` overloads exist;
+the existing `MTLCommandBuffer`-taking methods continue to work for visionOS < 26
+and for pinning to Metal 3.
+
+`Context.init` gained an `externalMetal4CommandQueue: Any? = nil` parameter
+(erased to `Any?` so the initializer stays available on pre-OS-26 callers).
+When non-nil and `backend == .metal4`, Satin's `Metal4Support` adopts that queue
+instead of creating its own. Used by `SpatialRenderer.makeDefaultContext` to
+hand the compositor's queue into the Satin renderer stack.
+
 Known fallback boundaries:
 
 - Metal Performance Shaders blur, upscale, and AR matte paths still require `MTLCommandBuffer`; their frame-command overloads return `false` or `nil` for Metal 4 commands so callers can fall back explicitly.
-- `SpatialRenderer` defaults its compositor context to Metal 3 because `LayerRenderer.Drawable.encodePresent(commandBuffer:)` still presents through `MTLCommandBuffer`.
+- visionOS Simulator does not expose MTL4 types — build for visionOS device or pin the simulator target to `.metal3`.
 
 ## Architecture Refactor — Encoder / Orchestrator Split (Breaking)
 

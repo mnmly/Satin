@@ -207,9 +207,8 @@ These are tracked at known issues; none of them cause crashes — the renderer f
 | Tessellation | Not supported on Metal 4 | `MTL4RenderCommandEncoder` does not yet expose `setTessellationFactorBuffer` / `drawPatches` / `drawIndexedPatches`. `RenderEncoderState` calls `failEncoding(...)` on Metal 4, which trips the MTL3 fallback. |
 | `CubemapGenerator(sigma > 0)` | MTL3 only | Uses `MPSImageGaussianBlur`, which doesn't accept an `MTL4CommandBuffer`. `encode(frameCommand:)` returns false for the blur path; the `sigma == 0` path works on both backends. |
 | `ARBackgroundDepthEncoder`, `ARFeatheredDepthMaskGenerator`, `ARDepthUpscaler`, `ARMatteEncoder` | MTL3 only | All depend on Metal Performance Shaders kernels that take `MTLCommandBuffer`. They explicitly guard `frameCommand as? MetalFrameCommand` and return false on Metal 4. |
-| visionOS `SpatialRenderer` compositor | MTL3 only | `LayerRenderer.Drawable.encodePresent(commandBuffer:)` still takes an `MTLCommandBuffer`. The compositor pins its render context to Metal 3 even when the scene rendering uses Metal 4. |
-| Vertex amplification count > 2 | Not supported on Metal 4 | `drawMetal4Forward` rejects amplification counts above 2. Custom view mappings *are* now supported (synthesised identity mappings on visionOS stereo). |
 | `Metal4RenderCommandEncoder.useResource` | Forwarded to argument table residency | Direct `useResource` is implemented via argument-table residency-set add. Heap-backed resources that aren't bound through argument tables would need explicit residency-set tracking by the caller. |
+| visionOS Simulator Metal 4 | Unsupported on simulator SDK | The visionOS Simulator SDK does not expose `MTL4*` types. Build for visionOS device, or pin the simulator target to `.metal3`. |
 
 ---
 

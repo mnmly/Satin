@@ -96,6 +96,17 @@ open class Renderer {
         }
     }
 
+    /// Add a completion handler to the command buffer that signals the in-flight
+    /// semaphore on GPU finish. Use this when you commit the buffer yourself
+    /// (e.g. SpatialRenderer's postDraw) and only need slot tracking, not commit.
+    func registerInFlight(_ commandBuffer: MTLCommandBuffer) {
+        inFlightSemaphoreWait += 1
+        commandBuffer.addCompletedHandler { [weak self] _ in
+            self?.inFlightSemaphore.signal()
+            self?.inFlightSemaphoreRelease -= 1
+        }
+    }
+
     internal func makeMetalFrameCommand() -> MetalFrameCommand? {
         waitForAvailableFrameSlot()
         frameIndex += 1

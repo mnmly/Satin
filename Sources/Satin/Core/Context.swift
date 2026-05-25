@@ -60,13 +60,23 @@ public struct Context {
         normalsPixelFormat: MTLPixelFormat = .rgba16Float,
         pbrPixelFormat: MTLPixelFormat = .rgba8Unorm,
         velocityPixelFormat: MTLPixelFormat = .rg16Float,
-        emissivePixelFormat: MTLPixelFormat = .rgba16Float
+        emissivePixelFormat: MTLPixelFormat = .rgba16Float,
+        // Optional pre-existing MTL4 command queue — pass the compositor's queue
+        // from cp_layer_renderer_get_mtl4_command_queue when integrating with the
+        // visionOS spatial compositor. Erased to Any? to keep this initializer
+        // available on pre-OS-26 callers. Ignored unless requestedBackend == .metal4.
+        externalMetal4CommandQueue: Any? = nil
     ) {
         self.id = id
         self.device = device
         self.commandQueue = device.makeCommandQueue()!
         self.requestedBackend = requestedBackend
-        self.metal4SupportStorage = Self.makeMetal4Support(device: device, requestedBackend: requestedBackend, maxBuffersInFlight: maxBuffersInFlight)
+        self.metal4SupportStorage = Self.makeMetal4Support(
+            device: device,
+            requestedBackend: requestedBackend,
+            maxBuffersInFlight: maxBuffersInFlight,
+            externalCommandQueue: externalMetal4CommandQueue
+        )
         self.backend = metal4SupportStorage == nil ? .metal3 : requestedBackend
         self.sampleCount = sampleCount
         self.colorPixelFormat = colorPixelFormat
@@ -87,7 +97,8 @@ public struct Context {
     private static func makeMetal4Support(
         device: MTLDevice,
         requestedBackend: MetalBackend,
-        maxBuffersInFlight: Int
+        maxBuffersInFlight: Int,
+        externalCommandQueue: Any?
     ) -> Any? {
         guard requestedBackend == .metal4 else { return nil }
 
@@ -96,7 +107,12 @@ public struct Context {
             // require MTLGPUFamily.metal4 — Apple7+ silicon, no Intel / AMD.
             // See Reference/Documentations/Metal-Feature-Set-Tables.pdf p.5.
             guard device.supportsFamily(.metal4) else { return nil }
-            return Metal4Support(device: device, maxBuffersInFlight: maxBuffersInFlight)
+            let typedQueue = externalCommandQueue as? (any MTL4CommandQueue)
+            return Metal4Support(
+                device: device,
+                maxBuffersInFlight: maxBuffersInFlight,
+                commandQueue: typedQueue
+            )
         }
 
         return nil

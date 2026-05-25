@@ -24,9 +24,18 @@ internal final class Metal4Support {
     // self-enforcing even if a caller bypasses the renderer's in-flight semaphore.
     private let slotCompletionSemaphores: [DispatchSemaphore]
 
-    init?(device: MTLDevice, maxBuffersInFlight: Int) {
-        guard let commandQueue = device.makeMTL4CommandQueue(),
-              let commandBuffer = device.makeCommandBuffer(),
+    /// - Parameter commandQueue: optionally provide a pre-existing MTL4 queue
+    ///   (e.g. the visionOS CompositorServices layer renderer's queue). When nil,
+    ///   Satin creates its own via `device.makeMTL4CommandQueue()`.
+    init?(device: MTLDevice, maxBuffersInFlight: Int, commandQueue: (any MTL4CommandQueue)? = nil) {
+        let resolvedQueue: any MTL4CommandQueue
+        if let commandQueue {
+            resolvedQueue = commandQueue
+        } else {
+            guard let created = device.makeMTL4CommandQueue() else { return nil }
+            resolvedQueue = created
+        }
+        guard let commandBuffer = device.makeCommandBuffer(),
               let fallbackEvent = device.makeSharedEvent()
         else { return nil }
         fallbackEvent.label = "Satin Metal 4 Fallback Event"
@@ -56,7 +65,7 @@ internal final class Metal4Support {
             residencySets.append(residencySet)
         }
 
-        self.commandQueue = commandQueue
+        self.commandQueue = resolvedQueue
         self.commandBuffer = commandBuffer
         self.commandAllocators = commandAllocators
         self.residencySets = residencySets

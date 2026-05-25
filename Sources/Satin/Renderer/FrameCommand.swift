@@ -51,8 +51,14 @@ internal final class Metal4FrameCommand: SatinCommittableFrameCommand {
     let commandAllocator: any MTL4CommandAllocator
     private let residencySet: (any MTLResidencySet)?
     private let argumentTablePool: Metal4ArgumentTablePool
+    // Signalled from the commit feedback handler after the GPU finishes using this
+    // slot's allocator / residency set. Metal4Support waits on this before reusing
+    // the slot — so allocator reset is gated on GPU completion regardless of how
+    // commit() was invoked.
+    private let slotCompletionSemaphore: DispatchSemaphore
     private var isEncoding = false
     private var residencyNeedsCommit = false
+    private var didSignalSlotCompletion = false
 
     init(
         frameIndex: Int,
@@ -61,7 +67,8 @@ internal final class Metal4FrameCommand: SatinCommittableFrameCommand {
         commandBuffer: any MTL4CommandBuffer,
         commandAllocator: any MTL4CommandAllocator,
         residencySet: (any MTLResidencySet)?,
-        argumentTablePool: Metal4ArgumentTablePool
+        argumentTablePool: Metal4ArgumentTablePool,
+        slotCompletionSemaphore: DispatchSemaphore
     ) {
         self.frameIndex = frameIndex
         self.frameSlot = frameSlot
@@ -70,6 +77,15 @@ internal final class Metal4FrameCommand: SatinCommittableFrameCommand {
         self.commandAllocator = commandAllocator
         self.residencySet = residencySet
         self.argumentTablePool = argumentTablePool
+        self.slotCompletionSemaphore = slotCompletionSemaphore
+    }
+
+    deinit {
+        // If the caller never committed, release the slot so Metal4Support doesn't
+        // deadlock the next frame waiting on a signal that never comes.
+        if !didSignalSlotCompletion {
+            slotCompletionSemaphore.signal()
+        }
     }
 
     func begin() {
@@ -110,14 +126,18 @@ internal final class Metal4FrameCommand: SatinCommittableFrameCommand {
 
     func commit(onCompleted: (() -> Void)?) {
         end()
-        if let onCompleted {
-            let options = MTL4CommitOptions()
-            options.addFeedbackHandler { _ in
-                onCompleted()
-            }
-            commandQueue.commit([commandBuffer], options: options)
-        } else {
-            commandQueue.commit([commandBuffer])
+        // Always wire a feedback handler so the slot semaphore is released after
+        // GPU completion — even when the caller doesn't supply onCompleted.
+        let options = MTL4CommitOptions()
+        let signalSlot: () -> Void = { [self] in
+            guard !didSignalSlotCompletion else { return }
+            didSignalSlotCompletion = true
+            slotCompletionSemaphore.signal()
         }
+        options.addFeedbackHandler { _ in
+            signalSlot()
+            onCompleted?()
+        }
+        commandQueue.commit([commandBuffer], options: options)
     }
 }

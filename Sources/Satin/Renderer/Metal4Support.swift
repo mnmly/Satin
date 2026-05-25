@@ -14,6 +14,10 @@ internal final class Metal4Support {
     let commandAllocators: [any MTL4CommandAllocator]
     let residencySets: [any MTLResidencySet]
     private let argumentTablePool: Metal4ArgumentTablePool
+    // Per-slot completion gates. begin() on a slot waits here; the commit feedback
+    // handler signals here. This makes "allocator reset only after GPU completion"
+    // self-enforcing even if a caller bypasses the renderer's in-flight semaphore.
+    private let slotCompletionSemaphores: [DispatchSemaphore]
 
     init?(device: MTLDevice, maxBuffersInFlight: Int) {
         guard let commandQueue = device.makeMTL4CommandQueue(),
@@ -50,11 +54,14 @@ internal final class Metal4Support {
         self.commandAllocators = commandAllocators
         self.residencySets = residencySets
         self.argumentTablePool = Metal4ArgumentTablePool(device: device, frameSlotCount: maxBuffersInFlight)
+        self.slotCompletionSemaphores = (0 ..< maxBuffersInFlight).map { _ in DispatchSemaphore(value: 1) }
     }
 
     func makeFrameCommand(frameIndex: Int) -> Metal4FrameCommand? {
         guard !commandAllocators.isEmpty else { return nil }
         let frameSlot = frameIndex % commandAllocators.count
+        // Block on the per-slot gate before reusing the allocator / residency set.
+        slotCompletionSemaphores[frameSlot].wait()
         argumentTablePool.reset(frameSlot: frameSlot)
         let frameCommand = Metal4FrameCommand(
             frameIndex: frameIndex,
@@ -63,7 +70,8 @@ internal final class Metal4Support {
             commandBuffer: commandBuffer,
             commandAllocator: commandAllocators[frameSlot],
             residencySet: residencySets.indices.contains(frameSlot) ? residencySets[frameSlot] : nil,
-            argumentTablePool: argumentTablePool
+            argumentTablePool: argumentTablePool,
+            slotCompletionSemaphore: slotCompletionSemaphores[frameSlot]
         )
         frameCommand.begin()
         return frameCommand

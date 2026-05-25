@@ -45,31 +45,61 @@ internal final class MetalFrameCommand: SatinCommittableFrameCommand {
 internal final class Metal4FrameCommand: SatinCommittableFrameCommand {
     let backend: MetalBackend = .metal4
     let frameIndex: Int
+    let frameSlot: Int
     let commandQueue: any MTL4CommandQueue
     let commandBuffer: any MTL4CommandBuffer
     let commandAllocator: any MTL4CommandAllocator
+    private let residencySet: (any MTLResidencySet)?
+    private let argumentTablePool: Metal4ArgumentTablePool
     private var isEncoding = false
+    private var residencyNeedsCommit = false
 
     init(
         frameIndex: Int,
+        frameSlot: Int,
         commandQueue: any MTL4CommandQueue,
         commandBuffer: any MTL4CommandBuffer,
-        commandAllocator: any MTL4CommandAllocator
+        commandAllocator: any MTL4CommandAllocator,
+        residencySet: (any MTLResidencySet)?,
+        argumentTablePool: Metal4ArgumentTablePool
     ) {
         self.frameIndex = frameIndex
+        self.frameSlot = frameSlot
         self.commandQueue = commandQueue
         self.commandBuffer = commandBuffer
         self.commandAllocator = commandAllocator
+        self.residencySet = residencySet
+        self.argumentTablePool = argumentTablePool
     }
 
     func begin() {
         commandAllocator.reset()
         commandBuffer.beginCommandBuffer(allocator: commandAllocator)
+        residencyNeedsCommit = false
+        if let residencySet {
+            residencySet.removeAllAllocations()
+            residencySet.commit()
+            commandBuffer.useResidencySet(residencySet)
+        }
         isEncoding = true
+    }
+
+    func useResource(_ resource: MTLResource) {
+        guard let residencySet, !residencySet.containsAllocation(resource) else { return }
+        residencySet.addAllocation(resource)
+        residencyNeedsCommit = true
+    }
+
+    func makeRenderArgumentTables() -> Metal4ArgumentTables? {
+        argumentTablePool.makeRenderArgumentTables(frameSlot: frameSlot, resourceHandler: useResource)
     }
 
     func end() {
         guard isEncoding else { return }
+        if residencyNeedsCommit {
+            residencySet?.commit()
+            residencyNeedsCommit = false
+        }
         commandBuffer.endCommandBuffer()
         isEncoding = false
     }

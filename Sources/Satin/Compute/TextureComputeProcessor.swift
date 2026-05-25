@@ -83,7 +83,7 @@ open class TextureComputeProcessor: ComputeProcessor {
         guard (_reset && resetPipeline != nil) || updatePipeline != nil else { return true }
         guard computeTextures.count > 0,
               let computeEncoder = frameCommand.commandBuffer.makeComputeCommandEncoder(),
-              let argumentTable = Metal4ComputeArgumentTable(device: device)
+              let argumentTable = Metal4ComputeArgumentTable(device: device, resourceHandler: frameCommand.useResource)
         else { return false }
 
         computeEncoder.label = label

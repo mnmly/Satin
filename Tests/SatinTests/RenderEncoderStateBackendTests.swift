@@ -64,6 +64,31 @@ final class RenderEncoderStateBackendTests: XCTestCase {
 
         let tessellationFactorBuffer = try XCTUnwrap(device.makeBuffer(length: 256))
         XCTAssertFalse(state.setTessellationFactorBuffer(tessellationFactorBuffer, offset: 0, instanceStride: 0))
+        XCTAssertEqual(state.lastBindingFailure, "Binding is outside Metal 4 argument table limits.")
+
+        renderCommand.renderEncoder.endEncoding()
+        frameCommand.end()
+    }
+
+    func testMetal4RenderEncoderStateRecordsTessellationFailure() throws {
+        guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) else {
+            throw XCTSkip("Metal 4 render encoder state requires OS 26 SDK runtime support.")
+        }
+
+        let device = try XCTUnwrap(MTLCreateSystemDefaultDevice())
+        let support = try XCTUnwrap(Metal4Support(device: device, maxBuffersInFlight: 1))
+        let frameCommand = try XCTUnwrap(support.makeFrameCommand(frameIndex: 0))
+        let renderPassDescriptor = try makeRenderPassDescriptor(device: device)
+        let renderCommand = try XCTUnwrap(support.makeRenderCommand(renderPassDescriptor: renderPassDescriptor))
+        let argumentTables = try XCTUnwrap(Metal4ArgumentTables(device: device))
+        let state = RenderEncoderState(
+            metal4RenderEncoder: renderCommand.renderEncoder,
+            argumentTables: argumentTables
+        )
+        let tessellationFactorBuffer = try XCTUnwrap(device.makeBuffer(length: 256))
+
+        XCTAssertFalse(state.setTessellationFactorBuffer(tessellationFactorBuffer, offset: 0, instanceStride: 0))
+        XCTAssertEqual(state.lastBindingFailure, "Metal 4 frame-command rendering does not support tessellation.")
 
         renderCommand.renderEncoder.endEncoding()
         frameCommand.end()

@@ -167,7 +167,7 @@ public final class SpotShadow: Shadow {
 
         let metal4Descriptor = Metal4RenderPassBridge.makeDescriptor(from: renderPassDescriptor)
         guard let renderEncoder = frameCommand.commandBuffer.makeRenderCommandEncoder(descriptor: metal4Descriptor),
-              let argumentTables = Metal4ArgumentTables(device: context.device)
+              let argumentTables = frameCommand.makeRenderArgumentTables()
         else { return false }
 
         renderEncoder.setViewports([viewport])
@@ -180,6 +180,10 @@ public final class SpotShadow: Shadow {
             renderEncoderState.windingOrder = renderable.windingOrder
             renderEncoderState.triangleFillMode = renderable.triangleFillMode
             renderable.draw(renderContext: context, renderEncoderState: renderEncoderState, shadow: true)
+            if renderEncoderState.lastBindingFailure != nil {
+                renderEncoder.endEncoding()
+                return false
+            }
         }
 
         renderEncoder.endEncoding()

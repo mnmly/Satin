@@ -244,6 +244,10 @@ public final class RenderEncoderState {
         commands.useResource(resource, usage: .read, stages: .fragment)
     }
 
+    func failEncoding(_ reason: String) {
+        commands.failEncoding(reason)
+    }
+
     public func drawPrimitives(type: MTLPrimitiveType, vertexStart: Int, vertexCount: Int, instanceCount: Int) {
         commands.drawPrimitives(
             type: type,
@@ -272,7 +276,10 @@ public final class RenderEncoderState {
     }
 
     public func setTessellationFactorBuffer(_ buffer: MTLBuffer, offset: Int, instanceStride: Int) -> Bool {
-        guard commands.supportsTessellation else { return false }
+        guard commands.supportsTessellation else {
+            commands.failEncoding("Metal 4 frame-command rendering does not support tessellation.")
+            return false
+        }
         commands.setTessellationFactorBuffer(buffer, offset: offset, instanceStride: instanceStride)
         return true
     }
@@ -286,7 +293,10 @@ public final class RenderEncoderState {
         instanceCount: Int,
         baseInstance: Int
     ) -> Bool {
-        guard commands.supportsTessellation else { return false }
+        guard commands.supportsTessellation else {
+            commands.failEncoding("Metal 4 frame-command rendering does not support tessellation.")
+            return false
+        }
         commands.drawPatches(
             numberOfPatchControlPoints: numberOfPatchControlPoints,
             patchStart: patchStart,
@@ -310,7 +320,10 @@ public final class RenderEncoderState {
         instanceCount: Int,
         baseInstance: Int
     ) -> Bool {
-        guard commands.supportsTessellation else { return false }
+        guard commands.supportsTessellation else {
+            commands.failEncoding("Metal 4 frame-command rendering does not support tessellation.")
+            return false
+        }
         commands.drawIndexedPatches(
             numberOfPatchControlPoints: numberOfPatchControlPoints,
             patchStart: patchStart,

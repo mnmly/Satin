@@ -13,6 +13,52 @@ final class RendererFrameCommandTests: XCTestCase {
         }
     }
 
+    final class BindingProbeTextureComputeSystem: TextureComputeSystem {
+        override var prefix: String { "RandomNoise" }
+
+        init(device: MTLDevice, textureDescriptor: MTLTextureDescriptor) {
+            super.init(
+                device: device,
+                pipelinesURL: getPipelinesComputeURL()!,
+                textureDescriptors: [textureDescriptor]
+            )
+        }
+
+        override func bind(_ binding: any ComputeArgumentBinding, iteration: Int) -> Int {
+            let index = super.bind(binding, iteration: iteration)
+            binding.setTexture(dstTexture, index: index)
+            return index + 1
+        }
+    }
+
+    final class RecordingComputeArgumentBinding: ComputeArgumentBinding {
+        let backend: MetalBackend
+        var buffers: [(offset: Int, index: Int)] = []
+        var textures: [Int] = []
+
+        init(backend: MetalBackend) {
+            self.backend = backend
+        }
+
+        func setBuffer(_ buffer: MTLBuffer, offset: Int, index: ComputeBufferIndex) -> Bool {
+            setBuffer(buffer, offset: offset, index: index.rawValue)
+        }
+
+        func setBuffer(_ buffer: MTLBuffer, offset: Int, index: Int) -> Bool {
+            buffers.append((offset: offset, index: index))
+            return true
+        }
+
+        func setTexture(_ texture: MTLTexture?, index: ComputeTextureIndex) -> Bool {
+            setTexture(texture, index: index.rawValue)
+        }
+
+        func setTexture(_ texture: MTLTexture?, index: Int) -> Bool {
+            textures.append(index)
+            return texture != nil
+        }
+    }
+
     private func makeDevice() -> MTLDevice? {
         MTLCreateSystemDefaultDevice()
     }
@@ -452,6 +498,19 @@ final class RendererFrameCommandTests: XCTestCase {
         renderer.commitFrameCommand(frameCommand)
     }
 
+    func testTextureComputeSystemExposesPublicArgumentBindingOverride() throws {
+        let device = try XCTUnwrap(makeDevice())
+        let compute = BindingProbeTextureComputeSystem(
+            device: device,
+            textureDescriptor: makeComputeTextureDescriptor(pixelFormat: .rgba32Float)
+        )
+        let binding = RecordingComputeArgumentBinding(backend: .metal4)
+
+        XCTAssertEqual(compute.bind(binding, iteration: 0), ComputeTextureIndex.Custom0.rawValue + 2)
+        XCTAssertEqual(binding.backend, .metal4)
+        XCTAssertEqual(binding.textures, [ComputeTextureIndex.Custom0.rawValue, ComputeTextureIndex.Custom0.rawValue + 1])
+    }
+
     func testMetal4FrameCommandSupportsBrdfGenerator() throws {
         guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) else {
             throw XCTSkip("Metal 4 requires OS 26 or newer.")
@@ -633,6 +692,10 @@ final class RendererFrameCommandTests: XCTestCase {
     }
 
     private func makeComputeTexture(device: MTLDevice, pixelFormat: MTLPixelFormat) -> MTLTexture? {
+        device.makeTexture(descriptor: makeComputeTextureDescriptor(pixelFormat: pixelFormat))
+    }
+
+    private func makeComputeTextureDescriptor(pixelFormat: MTLPixelFormat) -> MTLTextureDescriptor {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: pixelFormat,
             width: 4,
@@ -640,7 +703,7 @@ final class RendererFrameCommandTests: XCTestCase {
             mipmapped: false
         )
         descriptor.usage = [.shaderRead, .shaderWrite]
-        return device.makeTexture(descriptor: descriptor)
+        return descriptor
     }
 
     private func makeShaderTexture(device: MTLDevice, pixelFormat: MTLPixelFormat) -> MTLTexture? {

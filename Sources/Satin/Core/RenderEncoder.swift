@@ -1240,21 +1240,18 @@ open class RenderEncoder {
         configureAuxiliaryAttachments(renderPassDescriptor: renderPassDescriptor, enabled: false)
         configureMainStoreActionsForSampleCount(renderPassDescriptor: renderPassDescriptor)
 
-        guard let renderCommand = makeMetal4RenderCommand(renderPassDescriptor: renderPassDescriptor, frameCommand: frameCommand),
-              let argumentTables = Metal4ArgumentTables(device: context.device)
-        else { return false }
-
-        configureMetal4RenderEncoder(renderCommand.renderEncoder, viewports: viewports, viewMappings: viewMappings)
-        argumentTables.bind(to: renderCommand.renderEncoder)
-        let renderEncoderState = RenderEncoderState(
-            metal4RenderEncoder: renderCommand.renderEncoder,
-            argumentTables: argumentTables
-        )
+        guard let encoding = makeMetal4RenderEncoding(
+            renderPassDescriptor: renderPassDescriptor,
+            frameCommand: frameCommand,
+            viewports: viewports,
+            viewMappings: viewMappings,
+            failureReason: "Metal 4 deferred lighting render command encoder could not be created."
+        ) else { return false }
 
         let deferredCameras = Array(repeating: deferredLightingCamera, count: max(context.vertexAmplificationCount, 1))
         encode(
             renderEncoder: nil,
-            renderEncoderState: renderEncoderState,
+            renderEncoderState: encoding.renderEncoderState,
             pass: 0,
             renderables: [deferredLightingMesh],
             cameras: deferredCameras,
@@ -1262,10 +1259,18 @@ open class RenderEncoder {
             phase: .unlitOpaque
         )
 
+        if encoding.renderEncoderState.lastBindingFailure != nil {
+            return finishMetal4RenderEncoding(
+                encoding.renderCommand,
+                renderEncoderState: encoding.renderEncoderState,
+                failurePrefix: "Metal 4 deferred lighting failed"
+            )
+        }
+
         if let firstEntry = unlitEntries.first {
             encode(
                 renderEncoder: nil,
-                renderEncoderState: renderEncoderState,
+                renderEncoderState: encoding.renderEncoderState,
                 pass: firstEntry.pass,
                 renderables: firstEntry.renderables,
                 cameras: unlitCameras,
@@ -1274,7 +1279,15 @@ open class RenderEncoder {
             )
         }
 
-        renderCommand.renderEncoder.endEncoding()
+        if encoding.renderEncoderState.lastBindingFailure != nil {
+            return finishMetal4RenderEncoding(
+                encoding.renderCommand,
+                renderEncoderState: encoding.renderEncoderState,
+                failurePrefix: "Metal 4 deferred lighting failed"
+            )
+        }
+
+        encoding.renderCommand.renderEncoder.endEncoding()
 
         for (i, entry) in unlitEntries.dropFirst().enumerated() {
             let isFinal = i == unlitEntries.count - 2
@@ -1286,26 +1299,28 @@ open class RenderEncoder {
             renderPassDescriptor.stencilAttachment.storeAction = isFinal ? finalStencilStoreAction : .store
             configureMainStoreActionsForSampleCount(renderPassDescriptor: renderPassDescriptor)
 
-            guard let unlitCommand = makeMetal4RenderCommand(renderPassDescriptor: renderPassDescriptor, frameCommand: frameCommand),
-                  let unlitArgumentTables = Metal4ArgumentTables(device: context.device)
-            else { continue }
+            guard let unlitEncoding = makeMetal4RenderEncoding(
+                renderPassDescriptor: renderPassDescriptor,
+                frameCommand: frameCommand,
+                viewports: viewports,
+                viewMappings: viewMappings,
+                failureReason: "Metal 4 deferred unlit fallback render command encoder could not be created."
+            ) else { continue }
 
-            configureMetal4RenderEncoder(unlitCommand.renderEncoder, viewports: viewports, viewMappings: viewMappings)
-            unlitArgumentTables.bind(to: unlitCommand.renderEncoder)
-            let unlitState = RenderEncoderState(
-                metal4RenderEncoder: unlitCommand.renderEncoder,
-                argumentTables: unlitArgumentTables
-            )
             encode(
                 renderEncoder: nil,
-                renderEncoderState: unlitState,
+                renderEncoderState: unlitEncoding.renderEncoderState,
                 pass: entry.pass,
                 renderables: entry.renderables,
                 cameras: unlitCameras,
                 viewports: simdViewports,
                 phase: .unlitOpaque
             )
-            unlitCommand.renderEncoder.endEncoding()
+            guard finishMetal4RenderEncoding(
+                unlitEncoding.renderCommand,
+                renderEncoderState: unlitEncoding.renderEncoderState,
+                failurePrefix: "Metal 4 deferred unlit fallback failed"
+            ) else { return false }
         }
 
         return true
@@ -2159,6 +2174,47 @@ open class RenderEncoder {
     }
 
     @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    private func makeMetal4RenderEncoding(
+        renderPassDescriptor: MTLRenderPassDescriptor,
+        frameCommand: Metal4FrameCommand,
+        viewports: [MTLViewport],
+        viewMappings: [MTLVertexAmplificationViewMapping],
+        failureReason: String,
+        bindArgumentTables: Bool = true
+    ) -> (renderCommand: Metal4RenderCommand, argumentTables: Metal4ArgumentTables, renderEncoderState: RenderEncoderState)? {
+        guard let renderCommand = makeMetal4RenderCommand(renderPassDescriptor: renderPassDescriptor, frameCommand: frameCommand),
+              let argumentTables = frameCommand.makeRenderArgumentTables()
+        else {
+            failFrameCommandDraw(failureReason)
+            return nil
+        }
+
+        configureMetal4RenderEncoder(renderCommand.renderEncoder, viewports: viewports, viewMappings: viewMappings)
+        if bindArgumentTables {
+            argumentTables.bind(to: renderCommand.renderEncoder)
+        }
+        let renderEncoderState = RenderEncoderState(
+            metal4RenderEncoder: renderCommand.renderEncoder,
+            argumentTables: argumentTables
+        )
+        return (renderCommand, argumentTables, renderEncoderState)
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    private func finishMetal4RenderEncoding(
+        _ renderCommand: Metal4RenderCommand,
+        renderEncoderState: RenderEncoderState,
+        failurePrefix: String
+    ) -> Bool {
+        if let bindingFailure = renderEncoderState.lastBindingFailure {
+            renderCommand.renderEncoder.endEncoding()
+            return failFrameCommandDraw("\(failurePrefix): \(bindingFailure)")
+        }
+        renderCommand.renderEncoder.endEncoding()
+        return true
+    }
+
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
     @discardableResult
     private func encodeMetal4AlphaOitRoute(
         renderPassDescriptor: MTLRenderPassDescriptor,
@@ -2195,33 +2251,29 @@ open class RenderEncoder {
             )
             configureMainStoreActionsForSampleCount(renderPassDescriptor: renderPassDescriptor)
 
-            guard let renderCommand = makeMetal4RenderCommand(renderPassDescriptor: renderPassDescriptor, frameCommand: frameCommand),
-                  let argumentTables = Metal4ArgumentTables(device: context.device)
-            else {
-                return failFrameCommandDraw("Metal 4 alpha OIT render command encoder could not be created.")
-            }
-
-            configureMetal4RenderEncoder(renderCommand.renderEncoder, viewports: viewports, viewMappings: viewMappings)
+            guard let encoding = makeMetal4RenderEncoding(
+                renderPassDescriptor: renderPassDescriptor,
+                frameCommand: frameCommand,
+                viewports: viewports,
+                viewMappings: viewMappings,
+                failureReason: "Metal 4 alpha OIT render command encoder could not be created.",
+                bindArgumentTables: false
+            ) else { return false }
 
 #if DEBUG
-            renderCommand.renderEncoder.pushDebugGroup("Alpha OIT Tile Init")
+            encoding.renderCommand.renderEncoder.pushDebugGroup("Alpha OIT Tile Init")
 #endif
-            renderCommand.renderEncoder.setRenderPipelineState(resources.tilePipeline)
-            renderCommand.renderEncoder.dispatchThreadsPerTile(alphaOitTileSize)
+            encoding.renderCommand.renderEncoder.setRenderPipelineState(resources.tilePipeline)
+            encoding.renderCommand.renderEncoder.dispatchThreadsPerTile(alphaOitTileSize)
 #if DEBUG
-            renderCommand.renderEncoder.popDebugGroup()
+            encoding.renderCommand.renderEncoder.popDebugGroup()
 #endif
 
-            argumentTables.bind(to: renderCommand.renderEncoder)
-            let renderEncoderState = RenderEncoderState(
-                metal4RenderEncoder: renderCommand.renderEncoder,
-                argumentTables: argumentTables
-            )
-
+            encoding.argumentTables.bind(to: encoding.renderCommand.renderEncoder)
             for entry in routeEntries {
                 encode(
                     renderEncoder: nil,
-                    renderEncoderState: renderEncoderState,
+                    renderEncoderState: encoding.renderEncoderState,
                     pass: entry.pass,
                     renderables: entry.renderables,
                     cameras: cameras,
@@ -2230,11 +2282,19 @@ open class RenderEncoder {
                 )
             }
 
-            renderCommand.renderEncoder.setRenderPipelineState(resources.blendPipeline)
-            renderCommand.renderEncoder.setDepthStencilState(resources.blendDepthStencilState)
-            renderCommand.renderEncoder.setCullMode(.none)
-            renderCommand.renderEncoder.drawPrimitives(primitiveType: .triangle, vertexStart: 0, vertexCount: 3)
-            renderCommand.renderEncoder.endEncoding()
+            if encoding.renderEncoderState.lastBindingFailure != nil {
+                return finishMetal4RenderEncoding(
+                    encoding.renderCommand,
+                    renderEncoderState: encoding.renderEncoderState,
+                    failurePrefix: "Metal 4 alpha OIT route failed"
+                )
+            }
+
+            encoding.renderCommand.renderEncoder.setRenderPipelineState(resources.blendPipeline)
+            encoding.renderCommand.renderEncoder.setDepthStencilState(resources.blendDepthStencilState)
+            encoding.renderCommand.renderEncoder.setCullMode(.none)
+            encoding.renderCommand.renderEncoder.drawPrimitives(primitiveType: .triangle, vertexStart: 0, vertexCount: 3)
+            encoding.renderCommand.renderEncoder.endEncoding()
 
             return true
         } catch {
@@ -2278,31 +2338,28 @@ open class RenderEncoder {
                 }
             }
 
-            guard let renderCommand = makeMetal4RenderCommand(renderPassDescriptor: renderPassDescriptor, frameCommand: frameCommand) else {
-                return failFrameCommandDraw("Metal 4 render command encoder could not be created.")
-            }
+            guard let encoding = makeMetal4RenderEncoding(
+                renderPassDescriptor: renderPassDescriptor,
+                frameCommand: frameCommand,
+                viewports: viewports,
+                viewMappings: viewMappings,
+                failureReason: "Metal 4 render command encoder could not be created."
+            ) else { return false }
 
-            guard let argumentTables = Metal4ArgumentTables(device: context.device) else {
-                return failFrameCommandDraw("Metal 4 argument tables could not be created.")
-            }
-
-            configureMetal4RenderEncoder(renderCommand.renderEncoder, viewports: viewports, viewMappings: viewMappings)
-            argumentTables.bind(to: renderCommand.renderEncoder)
-
-            let renderEncoderState = RenderEncoderState(
-                metal4RenderEncoder: renderCommand.renderEncoder,
-                argumentTables: argumentTables
-            )
             encode(
                 renderEncoder: nil,
-                renderEncoderState: renderEncoderState,
+                renderEncoderState: encoding.renderEncoderState,
                 pass: entry.pass,
                 renderables: entry.renderables,
                 cameras: cameras,
                 viewports: simdViewports,
                 phase: phase
             )
-            renderCommand.renderEncoder.endEncoding()
+            guard finishMetal4RenderEncoding(
+                encoding.renderCommand,
+                renderEncoderState: encoding.renderEncoderState,
+                failurePrefix: "Metal 4 \(label) route failed"
+            ) else { return false }
         }
 
         return true

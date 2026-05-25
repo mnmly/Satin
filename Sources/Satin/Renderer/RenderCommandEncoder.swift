@@ -31,6 +31,7 @@ internal protocol SatinRenderCommandEncoder {
     @discardableResult
     func setFragmentSamplerState(_ samplerState: MTLSamplerState?, index: Int) -> Bool
     func useResource(_ resource: MTLResource, usage: MTLResourceUsage, stages: MTLRenderStages)
+    func failEncoding(_ reason: String)
     func drawPrimitives(type: MTLPrimitiveType, vertexStart: Int, vertexCount: Int, instanceCount: Int)
     func drawIndexedPrimitives(
         type: MTLPrimitiveType,
@@ -134,6 +135,8 @@ internal final class MetalRenderCommandEncoder: SatinRenderCommandEncoder {
     func useResource(_ resource: MTLResource, usage: MTLResourceUsage, stages: MTLRenderStages) {
         renderEncoder.useResource(resource, usage: usage, stages: stages)
     }
+
+    func failEncoding(_ reason: String) {}
 
     func drawPrimitives(type: MTLPrimitiveType, vertexStart: Int, vertexCount: Int, instanceCount: Int) {
         renderEncoder.drawPrimitives(
@@ -287,9 +290,12 @@ internal final class Metal4RenderCommandEncoder: SatinRenderCommandEncoder {
 
     func setFragmentTextures(_ textures: [MTLTexture?], range: Range<Int>) -> Bool {
         var didBindAll = true
-        for (offset, texture) in textures.enumerated() {
+        if textures.count > range.count {
+            didBindAll = failBinding("Metal 4 fragment texture range \(range) cannot bind \(textures.count) textures.")
+        }
+        for (offset, texture) in textures.prefix(range.count).enumerated() {
             let index = range.lowerBound + offset
-            guard range.contains(index), let fragmentTextureIndex = FragmentTextureIndex(rawValue: index) else {
+            guard let fragmentTextureIndex = FragmentTextureIndex(rawValue: index) else {
                 didBindAll = failBinding("Unsupported Metal 4 fragment texture index \(index).")
                 continue
             }
@@ -306,19 +312,23 @@ internal final class Metal4RenderCommandEncoder: SatinRenderCommandEncoder {
     }
 
     private func setBinding(_ didBind: Bool) -> Bool {
-        if didBind {
-            lastBindingFailure = nil
-            return true
-        }
-        return failBinding("Binding is outside Metal 4 argument table limits.")
+        didBind ? true : failBinding("Binding is outside Metal 4 argument table limits.")
     }
 
     private func failBinding(_ reason: String) -> Bool {
-        lastBindingFailure = reason
+        if lastBindingFailure == nil {
+            lastBindingFailure = reason
+        }
         return false
     }
 
-    func useResource(_ resource: MTLResource, usage: MTLResourceUsage, stages: MTLRenderStages) {}
+    func useResource(_ resource: MTLResource, usage: MTLResourceUsage, stages: MTLRenderStages) {
+        argumentTables.useResource(resource)
+    }
+
+    func failEncoding(_ reason: String) {
+        _ = failBinding(reason)
+    }
 
     func drawPrimitives(type: MTLPrimitiveType, vertexStart: Int, vertexCount: Int, instanceCount: Int) {
         renderEncoder.drawPrimitives(
@@ -351,7 +361,9 @@ internal final class Metal4RenderCommandEncoder: SatinRenderCommandEncoder {
         max(0, indexBuffer.length - offset)
     }
 
-    func setTessellationFactorBuffer(_ buffer: MTLBuffer, offset: Int, instanceStride: Int) {}
+    func setTessellationFactorBuffer(_ buffer: MTLBuffer, offset: Int, instanceStride: Int) {
+        failEncoding("Metal 4 render command encoder does not support tessellation factor buffers.")
+    }
 
     func drawPatches(
         numberOfPatchControlPoints: Int,
@@ -361,7 +373,9 @@ internal final class Metal4RenderCommandEncoder: SatinRenderCommandEncoder {
         patchIndexBufferOffset: Int,
         instanceCount: Int,
         baseInstance: Int
-    ) {}
+    ) {
+        failEncoding("Metal 4 render command encoder does not support tessellation patches.")
+    }
 
     func drawIndexedPatches(
         numberOfPatchControlPoints: Int,
@@ -373,5 +387,7 @@ internal final class Metal4RenderCommandEncoder: SatinRenderCommandEncoder {
         controlPointIndexBufferOffset: Int,
         instanceCount: Int,
         baseInstance: Int
-    ) {}
+    ) {
+        failEncoding("Metal 4 render command encoder does not support indexed tessellation patches.")
+    }
 }

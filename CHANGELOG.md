@@ -1,5 +1,25 @@
 # Satin 2.0 Changelog
 
+## Metal 4 Backend Support
+
+Satin now has incremental Metal 4 frame-command support for renderer-owned render, post-process, shadow, and compute paths. `Context(device:backend:...)` accepts `.metal4` and falls back to `.metal3` when Metal 4 command queues are not available.
+
+Metal 4 render argument tables are pooled per frame slot and render pass, and bound resources are tracked through a per-frame residency set for explicit `gpuAddress` / `gpuResourceID` usage.
+
+Third-party compute subclasses can use the backend-neutral `ComputeArgumentBinding` surface instead of depending on Satin's internal Metal 4 argument-table type:
+
+- `ComputeProcessor.preComputeBinding`
+- `ComputeSystem.preComputeBinding`
+- `TextureComputeSystem.bind(_ binding:iteration:)`
+- `BufferComputeSystem.bind(_ binding:)`
+
+Legacy `MTLComputeCommandEncoder` hooks remain available for Metal 3 paths.
+
+Known fallback boundaries:
+
+- Metal Performance Shaders blur, upscale, and AR matte paths still require `MTLCommandBuffer`; their frame-command overloads return `false` or `nil` for Metal 4 commands so callers can fall back explicitly.
+- `SpatialRenderer` defaults its compositor context to Metal 3 because `LayerRenderer.Drawable.encodePresent(commandBuffer:)` still presents through `MTLCommandBuffer`.
+
 ## Architecture Refactor — Encoder / Orchestrator Split (Breaking)
 
 The old `Renderer` class was conflating two unrelated responsibilities: encoding a scene graph into a `MTLCommandBuffer`, and owning the render loop (display link, command queue, semaphore, frame index). These are now separated into two distinct tiers.

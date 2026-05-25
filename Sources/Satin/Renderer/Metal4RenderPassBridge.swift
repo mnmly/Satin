@@ -34,8 +34,18 @@ internal enum Metal4RenderPassBridge {
         // MTL4RenderPassDescriptor has sample-position selectors in Objective-C, but the
         // current Swift overlay does not expose them. Keep custom sample positions on the
         // classic path until Swift exposes a public MTL4 accessor.
+        assertNoCustomSamplePositions(descriptor)
 
         return result
+    }
+
+    private static func assertNoCustomSamplePositions(_ descriptor: MTLRenderPassDescriptor) {
+        #if DEBUG
+        let positions = descriptor.getSamplePositions()
+        if !positions.isEmpty {
+            assertionFailure("Metal 4 render pass bridge drops \(positions.count) custom sample position(s). Override on the classic Metal 3 path until the Swift overlay exposes MTL4 sample-position accessors.")
+        }
+        #endif
     }
 
     private static func copyColorAttachments(from source: MTLRenderPassDescriptor, to target: MTL4RenderPassDescriptor) {

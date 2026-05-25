@@ -19,8 +19,7 @@ internal final class Metal4ArgumentTables {
             label: "Satin Metal 4 Vertex Arguments",
             maxBufferBindCount: Metal4ArgumentBindingLayout.maxBufferBindCount,
             maxTextureBindCount: VertexTextureIndex.Custom16.rawValue + 1,
-            maxSamplerStateBindCount: 0,
-            supportAttributeStrides: true
+            maxSamplerStateBindCount: 0
         ),
         let fragmentDescriptor = Metal4ArgumentBindingLayout.makeArgumentTableDescriptor(
             label: "Satin Metal 4 Fragment Arguments",
@@ -51,6 +50,12 @@ internal final class Metal4ArgumentTables {
         resourceHandler?(resource)
     }
 
+    // Argument tables are pooled per (frame slot, pass cursor). If pass N in frame
+    // K-1 bound slot 7 and pass N in frame K does not, slot 7 would retain the
+    // stale binding — which is fine unless the pipeline used in frame K reads
+    // that slot. Clearing on reuse decouples binding lifetime from pipeline use,
+    // matching MTL3 setVertexBuffer/setFragmentBuffer semantics where unbound
+    // slots read as null.
     private func reset() {
         for index in 0 ..< Metal4ArgumentBindingLayout.maxBufferBindCount {
             vertex.setAddress(0, index: index)

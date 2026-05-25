@@ -243,6 +243,60 @@ final class RendererFrameCommandTests: XCTestCase {
         renderer.commitFrameCommand(frameCommand)
     }
 
+    func testMetal4FrameCommandDrawSupportsCustomVertexAmplificationViewMappings() throws {
+        guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) else {
+            throw XCTSkip("Metal 4 requires OS 26 or newer.")
+        }
+
+        let device = try XCTUnwrap(makeDevice())
+        let context = Context(
+            device: device,
+            backend: .metal4,
+            sampleCount: 1,
+            colorPixelFormat: .bgra8Unorm,
+            vertexAmplificationCount: 2
+        )
+        guard context.backend == .metal4 else {
+            throw XCTSkip("Metal 4 command queues are not available on this device.")
+        }
+
+        let renderer = TestRenderer(context: context)
+        let frameCommand = try XCTUnwrap(renderer.makeFrameCommand() as? Metal4FrameCommand)
+        let renderEncoder = RenderEncoder(context: context)
+        let scene = Object(context: context)
+        let cameras = [
+            PerspectiveCamera(context: context, position: [0.0, 0.0, 4.0], near: 0.1, far: 100.0, fov: 30.0),
+            PerspectiveCamera(context: context, position: [0.0, 0.0, 4.0], near: 0.1, far: 100.0, fov: 30.0)
+        ]
+        let renderPassDescriptor = MTLRenderPassDescriptor()
+        renderPassDescriptor.colorAttachments[0].texture = try XCTUnwrap(makeArrayTexture(device: device, arrayLength: 2))
+        renderPassDescriptor.colorAttachments[0].loadAction = .clear
+        renderPassDescriptor.colorAttachments[0].storeAction = .store
+        renderPassDescriptor.renderTargetArrayLength = 2
+        renderPassDescriptor.renderTargetWidth = 4
+        renderPassDescriptor.renderTargetHeight = 4
+
+        let viewMappings = [
+            MTLVertexAmplificationViewMapping(viewportArrayIndexOffset: 0, renderTargetArrayIndexOffset: 0),
+            MTLVertexAmplificationViewMapping(viewportArrayIndexOffset: 1, renderTargetArrayIndexOffset: 1)
+        ]
+
+        XCTAssertTrue(renderEncoder.draw(
+            renderPassDescriptor: renderPassDescriptor,
+            frameCommand: frameCommand,
+            scene: scene,
+            cameras: cameras,
+            viewports: [
+                MTLViewport(originX: 0, originY: 0, width: 4, height: 4, znear: 0, zfar: 1),
+                MTLViewport(originX: 0, originY: 0, width: 4, height: 4, znear: 0, zfar: 1)
+            ],
+            viewMappings: viewMappings
+        ))
+        XCTAssertNil(renderEncoder.lastFrameCommandDrawFailure)
+
+        renderer.commitFrameCommand(frameCommand)
+    }
+
     func testMetal4FrameCommandDrawSupportsAlphaOit() throws {
         guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) else {
             throw XCTSkip("Metal 4 requires OS 26 or newer.")

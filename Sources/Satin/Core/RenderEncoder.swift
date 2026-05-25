@@ -1670,10 +1670,6 @@ open class RenderEncoder {
             return failFrameCommandDraw("Metal 4 frame-command rendering currently does not support vertex amplification.")
         }
 
-        guard viewMappings.isEmpty else {
-            return failFrameCommandDraw("Metal 4 frame-command rendering currently does not support custom vertex amplification view mappings.")
-        }
-
         guard renderPassDescriptor.colorAttachments[0].texture != nil || context.colorPixelFormat == .invalid else {
             return failFrameCommandDraw("Metal 4 frame-command rendering requires a color attachment texture.")
         }
@@ -2385,7 +2381,13 @@ open class RenderEncoder {
     ) {
         renderEncoder.setViewports(viewports)
         if context.vertexAmplificationCount > 1 {
-            renderEncoder.setVertexAmplificationCount(context.vertexAmplificationCount)
+            var maps = viewMappings
+            if maps.isEmpty {
+                maps = (0..<context.vertexAmplificationCount).map {
+                    .init(viewportArrayIndexOffset: UInt32($0), renderTargetArrayIndexOffset: UInt32($0))
+                }
+            }
+            renderEncoder.setVertexAmplificationCount(maps)
         }
     }
 

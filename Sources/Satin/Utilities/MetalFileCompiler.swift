@@ -69,59 +69,43 @@ public final class MetalFileCompiler {
             content = try String(contentsOf: fileURLResolved, encoding: .utf8)
             watchFile = true
         } catch {
+            // The include resolved to a path that doesn't exist (e.g.
+            // `Library/Pbr/Pbr.metal` evaluated relative to a material's own
+            // directory). Reinterpret it as relative to one of the central
+            // pipeline subdirectories. Each candidate is tried in order; we
+            // accept the first one that actually points at a real file so an
+            // incidental path component (e.g. a clone living under a folder
+            // named "Satin") doesn't latch onto the wrong root.
             let pathComponents = fileURLResolved.pathComponents
+            let candidates: [(name: String, root: URL?)] = [
+                ("Satin", getPipelinesSatinURL()),
+                ("Chunks", getPipelinesChunksURL()),
+                ("Library", getPipelinesLibraryURL()),
+                ("Includes", getPipelinesIncludesURL())
+            ]
 
-            if let index = pathComponents.lastIndex(of: "Satin"),
-               var frameworkFileURL = getPipelinesSatinURL()
-            {
+            var resolved = false
+            for (name, root) in candidates {
+                guard let index = pathComponents.lastIndex(of: name),
+                      var frameworkFileURL = root
+                else { continue }
+
                 for i in (index + 1) ..< pathComponents.count {
                     frameworkFileURL.appendPathComponent(pathComponents[i])
                 }
+
+                guard FileManager.default.fileExists(atPath: frameworkFileURL.path) else { continue }
 
                 if !files.contains(frameworkFileURL) {
                     content = try String(contentsOf: frameworkFileURL, encoding: .utf8)
                     fileURLResolved = frameworkFileURL
                     watchFile = true
                 }
+                resolved = true
+                break
+            }
 
-            } else if let index = pathComponents.lastIndex(of: "Chunks"),
-                      var frameworkFileURL = getPipelinesChunksURL()
-            {
-                for i in (index + 1) ..< pathComponents.count {
-                    frameworkFileURL.appendPathComponent(pathComponents[i])
-                }
-
-                if !files.contains(frameworkFileURL) {
-                    content = try String(contentsOf: frameworkFileURL, encoding: .utf8)
-                    fileURLResolved = frameworkFileURL
-                    watchFile = true
-                }
-
-            } else if let index = pathComponents.lastIndex(of: "Library"),
-                      var frameworkFileURL = getPipelinesLibraryURL()
-            {
-                for i in (index + 1) ..< pathComponents.count {
-                    frameworkFileURL.appendPathComponent(pathComponents[i])
-                }
-
-                if !files.contains(frameworkFileURL) {
-                    content = try String(contentsOf: frameworkFileURL, encoding: .utf8)
-                    fileURLResolved = frameworkFileURL
-                    watchFile = true
-                }
-            } else if let index = pathComponents.lastIndex(of: "Includes"),
-                      var frameworkFileURL = getPipelinesIncludesURL()
-            {
-                for i in (index + 1) ..< pathComponents.count {
-                    frameworkFileURL.appendPathComponent(pathComponents[i])
-                }
-
-                if !files.contains(frameworkFileURL) {
-                    content = try String(contentsOf: frameworkFileURL, encoding: .utf8)
-                    fileURLResolved = frameworkFileURL
-                    watchFile = true
-                }
-            } else {
+            if !resolved {
                 throw MetalFileCompilerError.invalidFile(fileURLResolved)
             }
         }

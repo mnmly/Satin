@@ -123,8 +123,14 @@ open class Geometry: BufferAttributeDelegate, InterleavedBufferDelegate, Element
         updateBuffers()
     }
 
+    /// Per-frame encode hook for Metal 3 command buffers. Override on subclasses that
+    /// regenerate or stream geometry per frame. On the Metal 4 backend this is **not**
+    /// called — also override `encode(frameCommand:)` for backend-agnostic per-frame work.
     open func encode(_ commandBuffer: MTLCommandBuffer) {}
 
+    /// Backend-agnostic per-frame encode hook. Default implementation forwards Metal 3
+    /// commands to `encode(_:)`; Metal 4 commands are a no-op. Override on subclasses
+    /// that need per-frame compute work that should run on both backends.
     open func encode(frameCommand: any SatinFrameCommand) {
         if let frameCommand = frameCommand as? MetalFrameCommand {
             encode(frameCommand.commandBuffer)

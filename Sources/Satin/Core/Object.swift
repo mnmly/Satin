@@ -522,8 +522,18 @@ open class Object: Codable {
         onUpdate?()
     }
 
+    /// Per-frame encode hook for Metal 3 command buffers. Subclasses doing per-frame
+    /// compute (e.g. updating an instance buffer via blit) should override this for
+    /// backwards compatibility with the classic backend. On the Metal 4 backend this
+    /// override is **not** called — also override `encode(frameCommand:)` and dispatch
+    /// per-backend, or your per-frame work will silently skip on `backend: .metal4`.
     open func encode(_ commandBuffer: MTLCommandBuffer) {}
 
+    /// Per-frame encode hook driven by both Metal 3 and Metal 4 frame commands. The
+    /// default implementation unwraps `MetalFrameCommand` and forwards to
+    /// `encode(_:)`; Metal 4 commands are a no-op. Override on subclasses that need
+    /// to do per-frame compute work in a way that supports both backends. For Metal 4
+    /// compute, build an `MTL4ComputeCommandEncoder` from `frameCommand.commandBuffer`.
     open func encode(frameCommand: any SatinFrameCommand) {
         if let frameCommand = frameCommand as? MetalFrameCommand {
             encode(frameCommand.commandBuffer)

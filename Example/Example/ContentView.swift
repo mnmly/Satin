@@ -83,10 +83,20 @@ struct ContentView: View {
                 items: [
                     ExampleItem(id: "2d", title: "2D", systemImage: "square") { Renderer2DView() },
                     ExampleItem(id: "3d", title: "3D", systemImage: "cube") { Renderer3DView() },
-                    ExampleItem(id: "metal4-backend", title: "Metal 4 Backend", systemImage: "bolt.horizontal.circle") { Metal4BackendRendererView() },
                     ExampleItem(id: "instanced-mesh", title: "Instanced Mesh", systemImage: "circle.grid.2x2.fill") { InstancedMeshRendererView() },
                     ExampleItem(id: "camera-controller", title: "Camera Controller", systemImage: "camera.aperture") { CameraControllerRendererView() },
                     ExampleItem(id: "orbit-camera-controller", title: "Orbit Camera Controller", systemImage: "rotate.3d.circle") { OrbitCameraControllerRendererView() }
+                ]
+            )
+        )
+
+        results.append(
+            ExampleSection(
+                title: "Metal 4",
+                items: [
+                    ExampleItem(id: "metal4-backend", title: "Backend", systemImage: "bolt.horizontal.circle") { Metal4BackendRendererView() },
+                    ExampleItem(id: "metal4-directional-shadow", title: "Directional Shadow", systemImage: "shadow") { Metal4DirectionalShadowRendererView() },
+                    ExampleItem(id: "metal4-deferred", title: "Deferred", systemImage: "square.stack.3d.down.forward") { Metal4DeferredRendererView() }
                 ]
             )
         )

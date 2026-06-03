@@ -131,6 +131,7 @@ struct ContentView: View {
             ExampleSection(
                 title: "Geometry",
                 items: [
+                    ExampleItem(id: "parametric-surfaces", title: "Parametric Surfaces", systemImage: "rotate.3d") { ParametricSurfacesRendererView() },
                     ExampleItem(id: "super-shapes", title: "Super Shapes", systemImage: "seal") { SuperShapesRendererView() },
                     ExampleItem(id: "obj-loading", title: "Obj Loading", systemImage: "arrow.down.doc") { LoadObjRendererView() },
                     ExampleItem(id: "octasphere", title: "Octasphere", systemImage: "globe") { OctasphereRendererView() },
@@ -168,12 +169,12 @@ struct ContentView: View {
             ExampleSection(
                 title: "Shadows",
                 items: [
-                    ExampleItem(id: "contact-shadow", title: "Contact Shadow (Utility)", systemImage: "square.2.layers.3d.bottom.filled") { ContactShadowRendererView() },
-                    ExampleItem(id: "directional-shadow", title: "Directional Shadow", systemImage: "shadow") { DirectionalShadowRendererView() },
-                    ExampleItem(id: "point-shadow", title: "Point Shadows", systemImage: "lightbulb.2") { PointShadowRendererView() },
-                    ExampleItem(id: "spot-shadow", title: "Spot Shadows", systemImage: "flashlight.on.fill") { SpotShadowRendererView() },
-                    ExampleItem(id: "projector", title: "Projector", systemImage: "film.stack") { ProjectorRendererView() },
-                    ExampleItem(id: "projected-shadow", title: "Projected Shadow (Utility)", systemImage: "shadow") { ProjectedShadowRendererView() }
+                    ExampleItem(id: "directional-shadow", title: "Directional Shadow", systemImage: "light.overhead.left") { DirectionalShadowRendererView() },
+                    ExampleItem(id: "point-shadow", title: "Point Shadows", systemImage: "pointer.arrow.rays") { PointShadowRendererView() },
+                    ExampleItem(id: "spot-shadow", title: "Spot Shadows", systemImage: "lamp.desk") { SpotShadowRendererView() },
+                    ExampleItem(id: "projector", title: "Projector", systemImage: "videoprojector") { ProjectorRendererView() },
+                    ExampleItem(id: "contact-shadow", title: "Custom Contact Shadow", systemImage: "app.shadow") { ContactShadowRendererView() },
+                    ExampleItem(id: "projected-shadow", title: "Custom Projected Shadow", systemImage: "app.shadow") { ProjectedShadowRendererView() }
                 ]
             )
         )
@@ -223,6 +224,21 @@ struct ContentView: View {
             )
         )
 
+        var postProcessingItems: [ExampleItem] = [
+            ExampleItem(id: "post-processing", title: "Post Processing", systemImage: "checkerboard.rectangle") { PostProcessingRendererView() },
+            ExampleItem(id: "bloom", title: "Bloom", systemImage: "sun.max.fill") { BloomRendererView() },
+            ExampleItem(id: "fxaa", title: "FXAA", systemImage: "squareshape.split.2x2.dotted") { FXAARendererView() },
+            ExampleItem(id: "motion-blur", title: "Motion Blur", systemImage: "gauge.with.needle") { MotionBlurRendererView() },
+        ]
+        #if os(macOS)
+            postProcessingItems.append(
+                ExampleItem(id: "screen-capture", title: "Screen Capture", systemImage: "display.and.arrow.down") {
+                    ScreenCaptureRendererView()
+                }
+            )
+        #endif
+        results.append(ExampleSection(title: "Post Processing", items: postProcessingItems))
+
         results.append(
             ExampleSection(
                 title: "Deferred Rendering",
@@ -236,24 +252,15 @@ struct ContentView: View {
                 ]
             )
         )
-
-        var postProcessingItems: [ExampleItem] = [
-            ExampleItem(id: "post-processing", title: "Post Processing", systemImage: "checkerboard.rectangle") { PostProcessingRendererView() },
-            ExampleItem(id: "bloom", title: "Bloom", systemImage: "sun.max.fill") { BloomRendererView() },
-            ExampleItem(id: "fxaa", title: "FXAA", systemImage: "squareshape.split.2x2.dotted") { FXAARendererView() },
-            ExampleItem(id: "motion-blur", title: "Motion Blur", systemImage: "gauge.with.needle") { MotionBlurRendererView() },
+        
+        let experimentalItems: [ExampleItem] = [
             ExampleItem(id: "ssgi-cornell-box", title: "SSGI Cornell Box", systemImage: "cube.transparent") { SSGICornellBoxRendererView() },
             ExampleItem(id: "ssgi-projector", title: "SSGI Projector", systemImage: "sparkles.tv") { SSGIProjectorRendererView() }
         ]
-        #if os(macOS)
-            postProcessingItems.append(
-                ExampleItem(id: "screen-capture", title: "Screen Capture", systemImage: "display.and.arrow.down") {
-                    ScreenCaptureRendererView()
-                }
-            )
-        #endif
-        results.append(ExampleSection(title: "Post Processing", items: postProcessingItems))
+        
+        results.append(ExampleSection(title: "Experimental", items: experimentalItems))
 
+        
         return results
     }
 

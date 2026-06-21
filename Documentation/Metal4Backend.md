@@ -145,7 +145,8 @@ Internally, the Metal 4 path uses:
 - **Per-slot `MTL4CommandAllocator`** — one per `maxBuffersInFlight` slot, reset at the start of each frame on that slot.
 - **Per-slot `MTLResidencySet`** — `useResidencySet` is attached to the command buffer; argument-table setters auto-register every bound buffer and texture so the resource is resident before the GPU executes.
 - **Per-slot `DispatchSemaphore`** — guarantees allocator/residency reset only happens after the GPU has finished using that slot's resources, even if a caller bypasses `Renderer.commitFrameCommand`.
-- **Pooled argument tables** — `Metal4ArgumentTablePool` reuses argument-table instances per (frame slot, pass cursor) instead of allocating them per frame. The pool clears dirty slots on reuse via bitset tracking (one bitwise-OR per bind, O(used) drain on reuse).
+- **Pooled argument tables** — `Metal4ArgumentTablePool` reuses argument-table instances per (frame slot, pass cursor) instead of allocating them per frame. The pool clears dirty slots on reuse via bitset tracking (one bitwise-OR per bind, O(used) drain on reuse). Tables are sized to Satin's full binding layout — including every directional-shadow texture (`DirectShadow0 + maxShadowTextures`) and projector slot — so a scene's shadow and projector bindings always fit; the only binding-range fallback left is a genuinely out-of-capacity custom index.
+- **Lazily-allocated backend resources** — a `Context`'s Metal 4 queue, command allocators, and residency sets are created on first frame-command use, not at `Context` init. The many `Context` values the renderer derives purely to key pipeline compilation never allocate them. `Context.backend` is decided up front from a device-capability check.
 - **Shared event for fallback** — a single `MTLSharedEvent` fences any MTL3 fallback work against the partial MTL4 buffer; see [Fallback behavior](#fallback-behavior).
 
 All of this is internal. The only public surface a Metal 4 caller needs is `frameCommand: any SatinFrameCommand`.
@@ -179,8 +180,8 @@ class MyAnimatedMesh: Mesh {
 
     override func encode(frameCommand: any SatinFrameCommand) {
         super.encode(frameCommand: frameCommand)
-        if let metal3 = frameCommand as? MetalFrameCommand {
-            regenerateVertexData(metal3.commandBuffer)
+        if let commandBuffer = frameCommand.metal3CommandBuffer {
+            regenerateVertexData(commandBuffer)
         } else if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
                   let metal4 = frameCommand as? Metal4FrameCommand,
                   let computeEncoder = metal4.commandBuffer.makeComputeCommandEncoder()
@@ -250,7 +251,7 @@ For existing Satin-based apps wanting to opt into Metal 4:
 1. **Change one line** — `Context.makePlatformDefault(backend: .metal4)` (or pass `backend: .metal4` to your existing `Context(...)` initialiser).
 2. **Run on Apple7+ hardware** with OS 26+ — the device-family gate falls back transparently elsewhere, but the new code only exercises on supported devices.
 3. **If you subclass `Object`/`Material`/`Geometry`** and override `encode(_ commandBuffer:)` for per-frame compute, also override `encode(frameCommand:)` — see [What changes for subclassers](#what-changes-for-subclassers).
-4. **If you use `MPSImage*` directly** in your own per-frame encoders, gate them on `frameCommand as? MetalFrameCommand` and provide a Metal-4-native path (or accept the MTL3 fallback for that subgraph).
+4. **If you use `MPSImage*` directly** in your own per-frame encoders, guard on `frameCommand.metal3CommandBuffer` (nil on the Metal 4 backend) and provide a Metal-4-native path (or accept the MTL3 fallback for that subgraph).
 5. **If you set custom sample positions** via `MTLRenderPassDescriptor.setSamplePositions(_:)`, they are now forwarded to the MTL4 descriptor automatically.
 6. **If you use tessellation**, the Metal 4 path will fail through to the MTL3 fallback for any frame that needs `drawPatches`. Expect occasional one-frame stalls when tessellated geometry first appears.
 7. **Run the perf tests** with `swift test --filter Metal4BackendPerfTests` to see how your specific scene shape compares. Small scenes may favour MTL3; binding-heavy scenes typically favour MTL4.

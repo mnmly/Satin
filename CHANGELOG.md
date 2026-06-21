@@ -37,6 +37,13 @@ Known fallback boundaries:
 - Metal Performance Shaders blur, upscale, and AR matte paths still require `MTLCommandBuffer`; their frame-command overloads return `false` or `nil` for Metal 4 commands so callers can fall back explicitly.
 - visionOS Simulator does not expose MTL4 types — build for visionOS device or pin the simulator target to `.metal3`.
 
+### Backend Fixes & Hardening
+
+- **Argument tables sized for the full binding layout.** The fragment argument table now spans every directional-shadow texture (`DirectShadow0 + maxShadowTextures`) and projector slot. Scenes with more than one shadowed directional light previously exceeded the table, failed the binding, and silently re-rendered every frame on the Metal 3 fallback — they now stay on Metal 4. Dirty-slot tracking was widened past 64 slots to match.
+- **Bindings keyed by raw index against each table's real capacity** instead of fixed index enums, reconciling the previously-disagreeing limits. Custom material binding indices within capacity now bind on Metal 4 rather than forcing the fallback.
+- **`Metal4Support` is allocated lazily.** The MTL4 queue, command allocators, and residency sets are created on first frame-command use, so the many `Context` values the renderer derives to key pipeline compilation no longer each allocate an unused backend. `Context.backend` is derived from a device-capability check.
+- **`SatinFrameCommand.metal3CommandBuffer`** exposes the classic command buffer (nil on Metal 4). Per-frame encoders that depend on `MTLCommandBuffer`-only APIs (e.g. MPS) should `guard let commandBuffer = frameCommand.metal3CommandBuffer` instead of casting to `MetalFrameCommand`.
+
 ## Architecture Refactor — Encoder / Orchestrator Split (Breaking)
 
 The old `Renderer` class was conflating two unrelated responsibilities: encoding a scene graph into a `MTLCommandBuffer`, and owning the render loop (display link, command queue, semaphore, frame index). These are now separated into two distinct tiers.

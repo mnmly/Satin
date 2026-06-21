@@ -59,7 +59,7 @@ let context = Context.makePlatformDefault(backend: .metal4)
 
 **Hardware requirements**
 
-`Context.makeMetal4Support` checks `device.supportsFamily(.metal4)` before instantiating any MTL4 objects. Per Apple's [Metal Feature Set Tables](https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf), that family covers **Apple7 silicon and newer** (M1, A14, and later) on macOS / iOS / visionOS 26.0. Older Apple GPUs, AMD discrete GPUs, and Intel integrated GPUs do not report `.metal4`.
+`Context` checks `device.supportsFamily(.metal4)` to decide `context.backend`; the MTL4 objects themselves (command queue, allocators, residency sets) are created lazily on first frame-command use. Per Apple's [Metal Feature Set Tables](https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf), that family covers **Apple7 silicon and newer** (M1, A14, and later) on macOS / iOS / visionOS 26.0. Older Apple GPUs, AMD discrete GPUs, and Intel integrated GPUs do not report `.metal4`.
 
 The opt-in is also OS-gated: even on supported hardware, Metal 4 requires the OS 26 SDK at runtime (`@available(macOS 26.0, iOS 26.0, visionOS 26.0, *)`).
 
@@ -165,7 +165,7 @@ open func encode(_ commandBuffer: MTLCommandBuffer)
 open func encode(frameCommand: any SatinFrameCommand)
 ```
 
-The default `encode(frameCommand:)` unwraps a `MetalFrameCommand` and forwards to `encode(_:)`. **On Metal 4 it is a no-op** unless you override it.
+The default `encode(frameCommand:)` forwards `frameCommand.metal3CommandBuffer` to `encode(_:)`. **On Metal 4 that buffer is nil, so it is a no-op** unless you override it.
 
 **If you don't do per-frame compute** (most subclasses), you don't need to do anything.
 
@@ -207,7 +207,7 @@ These are tracked at known issues; none of them cause crashes — the renderer f
 |---|---|---|
 | Tessellation | Not supported on Metal 4 | `MTL4RenderCommandEncoder` does not yet expose `setTessellationFactorBuffer` / `drawPatches` / `drawIndexedPatches`. `RenderEncoderState` calls `failEncoding(...)` on Metal 4, which trips the MTL3 fallback. |
 | `CubemapGenerator(sigma > 0)` | MTL3 only | Uses `MPSImageGaussianBlur`, which doesn't accept an `MTL4CommandBuffer`. `encode(frameCommand:)` returns false for the blur path; the `sigma == 0` path works on both backends. |
-| `ARBackgroundDepthEncoder`, `ARFeatheredDepthMaskGenerator`, `ARDepthUpscaler`, `ARMatteEncoder` | MTL3 only | All depend on Metal Performance Shaders kernels that take `MTLCommandBuffer`. They explicitly guard `frameCommand as? MetalFrameCommand` and return false on Metal 4. |
+| `ARBackgroundDepthEncoder`, `ARFeatheredDepthMaskGenerator`, `ARDepthUpscaler`, `ARMatteEncoder` | MTL3 only | All depend on Metal Performance Shaders kernels that take `MTLCommandBuffer`. They guard on `frameCommand.metal3CommandBuffer` (nil on Metal 4) and return false there. |
 | `Metal4RenderCommandEncoder.useResource` | Forwarded to argument table residency | Direct `useResource` is implemented via argument-table residency-set add. Heap-backed resources that aren't bound through argument tables would need explicit residency-set tracking by the caller. |
 | visionOS Simulator Metal 4 | Unsupported on simulator SDK | The visionOS Simulator SDK does not expose `MTL4*` types. Build for visionOS device, or pin the simulator target to `.metal3`. |
 

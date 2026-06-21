@@ -14,29 +14,40 @@ internal final class Metal4ArgumentTables {
     private var resourceHandler: ((MTLResource) -> Void)?
     private static let nilResourceID = MTLResourceID(_impl: 0)
 
+    // Per-table slot counts — each table is sized to exactly what Satin's binding layout uses.
+    // Setters guard against these (the table's real capacity) rather than the device-wide
+    // maximum, so a bind that fits succeeds and a bind past the end fails cleanly (→ fallback)
+    // instead of hitting a Metal range-validation error.
+    private static let vertexBufferBindCount = Metal4ArgumentBindingLayout.maxBufferBindCount
+    private static let vertexTextureBindCount = VertexTextureIndex.Custom16.rawValue + 1
+    private static let fragmentBufferBindCount = FragmentBufferIndex.DirectShadowMatrices.rawValue + 1
+    private static let fragmentTextureBindCount = Metal4ArgumentBindingLayout.maxFragmentTextureBindCount
+    private static let fragmentSamplerBindCount = Metal4ArgumentBindingLayout.maxSamplerStateBindCount
+
     // Track which slots were actually written since last reset so reuse clears
     // O(used) rather than O(maxBindCount). Profiling showed the previous
     // "zero every slot" reset cost ~11.7 µs/call across 137 MMIO writes.
-    // Bitsets sized to the max binding count of each slot type — all slot ranges
-    // fit comfortably in a single UInt64, so write-tracking is one bitwise-OR.
-    private var dirtyVertexBuffers: UInt64 = 0       // up to 31 slots
-    private var dirtyFragmentBuffers: UInt64 = 0     // up to 31 slots
-    private var dirtyVertexTextures: UInt64 = 0      // up to ~17 slots
-    private var dirtyFragmentTextures: UInt64 = 0    // up to 42 slots
-    private var dirtyFragmentSamplers: UInt64 = 0    // up to 16 slots
+    // DirtySlotMask spans the full Metal index range in two words — the fragment
+    // texture slots now extend past index 63 (DirectShadow0 + maxShadowTextures),
+    // which a single UInt64 could not track without shifting past its width.
+    private var dirtyVertexBuffers = DirtySlotMask()
+    private var dirtyFragmentBuffers = DirtySlotMask()
+    private var dirtyVertexTextures = DirtySlotMask()
+    private var dirtyFragmentTextures = DirtySlotMask()
+    private var dirtyFragmentSamplers = DirtySlotMask()
 
     init?(device: MTLDevice, resourceHandler: ((MTLResource) -> Void)? = nil) {
         guard let vertexDescriptor = Metal4ArgumentBindingLayout.makeArgumentTableDescriptor(
             label: "Satin Metal 4 Vertex Arguments",
-            maxBufferBindCount: Metal4ArgumentBindingLayout.maxBufferBindCount,
-            maxTextureBindCount: VertexTextureIndex.Custom16.rawValue + 1,
+            maxBufferBindCount: Self.vertexBufferBindCount,
+            maxTextureBindCount: Self.vertexTextureBindCount,
             maxSamplerStateBindCount: 0
         ),
         let fragmentDescriptor = Metal4ArgumentBindingLayout.makeArgumentTableDescriptor(
             label: "Satin Metal 4 Fragment Arguments",
-            maxBufferBindCount: FragmentBufferIndex.DirectShadowMatrices.rawValue + 1,
-            maxTextureBindCount: FragmentTextureIndex.DirectShadow0.rawValue + 1,
-            maxSamplerStateBindCount: Metal4ArgumentBindingLayout.maxSamplerStateBindCount
+            maxBufferBindCount: Self.fragmentBufferBindCount,
+            maxTextureBindCount: Self.fragmentTextureBindCount,
+            maxSamplerStateBindCount: Self.fragmentSamplerBindCount
         ),
         let vertex = try? device.makeArgumentTable(descriptor: vertexDescriptor),
         let fragment = try? device.makeArgumentTable(descriptor: fragmentDescriptor)
@@ -67,70 +78,88 @@ internal final class Metal4ArgumentTables {
     // that slot. Clearing on reuse decouples binding lifetime from pipeline use,
     // matching MTL3 setVertexBuffer/setFragmentBuffer semantics where unbound
     // slots read as null. Track which slots were touched so we only re-zero those.
-    /// Iterate set bits in a bitset and invoke `body` for each index, then clear.
-    @inline(__always)
-    private static func drain(_ mask: inout UInt64, body: (Int) -> Void) {
-        var bits = mask
-        while bits != 0 {
-            let i = bits.trailingZeroBitCount
-            body(i)
-            bits &= bits &- 1
-        }
-        mask = 0
+    private func reset() {
+        dirtyVertexBuffers.drain { vertex.setAddress(0, index: $0) }
+        dirtyFragmentBuffers.drain { fragment.setAddress(0, index: $0) }
+        dirtyVertexTextures.drain { vertex.setTexture(Self.nilResourceID, index: $0) }
+        dirtyFragmentTextures.drain { fragment.setTexture(Self.nilResourceID, index: $0) }
+        dirtyFragmentSamplers.drain { fragment.setSamplerState(Self.nilResourceID, index: $0) }
     }
 
-    private func reset() {
-        Self.drain(&dirtyVertexBuffers) { vertex.setAddress(0, index: $0) }
-        Self.drain(&dirtyFragmentBuffers) { fragment.setAddress(0, index: $0) }
-        Self.drain(&dirtyVertexTextures) { vertex.setTexture(Self.nilResourceID, index: $0) }
-        Self.drain(&dirtyFragmentTextures) { fragment.setTexture(Self.nilResourceID, index: $0) }
-        Self.drain(&dirtyFragmentSamplers) { fragment.setSamplerState(Self.nilResourceID, index: $0) }
-    }
+    // Bindings are keyed by raw index against each table's real capacity. The typed
+    // enums remain for naming at call sites, but the Metal 4 path no longer requires a
+    // matching enum case — contiguous slots without an enum (e.g. DirectShadow0 + N) and
+    // custom material indices within capacity now bind instead of tripping the fallback.
 
     @discardableResult
     func setVertexBuffer(_ buffer: MTLBuffer, offset: Int, index: VertexBufferIndex) -> Bool {
-        guard Metal4ArgumentBindingLayout.supportsBufferIndex(index.rawValue) else { return false }
+        setVertexBuffer(buffer, offset: offset, index: index.rawValue)
+    }
+
+    @discardableResult
+    func setVertexBuffer(_ buffer: MTLBuffer, offset: Int, index: Int) -> Bool {
+        guard index >= 0, index < Self.vertexBufferBindCount else { return false }
         resourceHandler?(buffer)
-        vertex.setAddress(buffer.gpuAddress + MTLGPUAddress(offset), index: index.rawValue)
-        dirtyVertexBuffers |= 1 << index.rawValue
+        vertex.setAddress(buffer.gpuAddress + MTLGPUAddress(offset), index: index)
+        dirtyVertexBuffers.mark(index)
         return true
     }
 
     @discardableResult
     func setFragmentBuffer(_ buffer: MTLBuffer, offset: Int, index: FragmentBufferIndex) -> Bool {
-        guard Metal4ArgumentBindingLayout.supportsBufferIndex(index.rawValue) else { return false }
+        setFragmentBuffer(buffer, offset: offset, index: index.rawValue)
+    }
+
+    @discardableResult
+    func setFragmentBuffer(_ buffer: MTLBuffer, offset: Int, index: Int) -> Bool {
+        guard index >= 0, index < Self.fragmentBufferBindCount else { return false }
         resourceHandler?(buffer)
-        fragment.setAddress(buffer.gpuAddress + MTLGPUAddress(offset), index: index.rawValue)
-        dirtyFragmentBuffers |= 1 << index.rawValue
+        fragment.setAddress(buffer.gpuAddress + MTLGPUAddress(offset), index: index)
+        dirtyFragmentBuffers.mark(index)
         return true
     }
 
     @discardableResult
     func setVertexTexture(_ texture: MTLTexture?, index: VertexTextureIndex) -> Bool {
-        guard Metal4ArgumentBindingLayout.supportsTextureIndex(index.rawValue) else { return false }
+        setVertexTexture(texture, index: index.rawValue)
+    }
+
+    @discardableResult
+    func setVertexTexture(_ texture: MTLTexture?, index: Int) -> Bool {
+        guard index >= 0, index < Self.vertexTextureBindCount else { return false }
         guard let texture else { return true }
         resourceHandler?(texture)
-        vertex.setTexture(texture.gpuResourceID, index: index.rawValue)
-        dirtyVertexTextures |= 1 << index.rawValue
+        vertex.setTexture(texture.gpuResourceID, index: index)
+        dirtyVertexTextures.mark(index)
         return true
     }
 
     @discardableResult
     func setFragmentTexture(_ texture: MTLTexture?, index: FragmentTextureIndex) -> Bool {
-        guard Metal4ArgumentBindingLayout.supportsTextureIndex(index.rawValue) else { return false }
+        setFragmentTexture(texture, index: index.rawValue)
+    }
+
+    @discardableResult
+    func setFragmentTexture(_ texture: MTLTexture?, index: Int) -> Bool {
+        guard index >= 0, index < Self.fragmentTextureBindCount else { return false }
         guard let texture else { return true }
         resourceHandler?(texture)
-        fragment.setTexture(texture.gpuResourceID, index: index.rawValue)
-        dirtyFragmentTextures |= 1 << index.rawValue
+        fragment.setTexture(texture.gpuResourceID, index: index)
+        dirtyFragmentTextures.mark(index)
         return true
     }
 
     @discardableResult
     func setFragmentSamplerState(_ samplerState: MTLSamplerState?, index: FragmentSamplerIndex) -> Bool {
-        guard Metal4ArgumentBindingLayout.supportsSamplerStateIndex(index.rawValue) else { return false }
+        setFragmentSamplerState(samplerState, index: index.rawValue)
+    }
+
+    @discardableResult
+    func setFragmentSamplerState(_ samplerState: MTLSamplerState?, index: Int) -> Bool {
+        guard index >= 0, index < Self.fragmentSamplerBindCount else { return false }
         guard let samplerState else { return true }
-        fragment.setSamplerState(samplerState.gpuResourceID, index: index.rawValue)
-        dirtyFragmentSamplers |= 1 << index.rawValue
+        fragment.setSamplerState(samplerState.gpuResourceID, index: index)
+        dirtyFragmentSamplers.mark(index)
         return true
     }
 }

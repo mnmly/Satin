@@ -535,8 +535,8 @@ open class Object: Codable {
     /// to do per-frame compute work in a way that supports both backends. For Metal 4
     /// compute, build an `MTL4ComputeCommandEncoder` from `frameCommand.commandBuffer`.
     open func encode(frameCommand: any SatinFrameCommand) {
-        if let frameCommand = frameCommand as? MetalFrameCommand {
-            encode(frameCommand.commandBuffer)
+        if let commandBuffer = frameCommand.metal3CommandBuffer {
+            encode(commandBuffer)
         }
     }
 

@@ -328,31 +328,19 @@ internal final class Metal4RenderCommandEncoder: SatinRenderCommandEncoder {
     }
 
     func setVertexBuffer(_ buffer: MTLBuffer, offset: Int, index: Int) -> Bool {
-        guard let vertexBufferIndex = VertexBufferIndex(rawValue: index) else {
-            return failBinding("Unsupported Metal 4 vertex buffer index \(index).")
-        }
-        return setBinding(argumentTables.setVertexBuffer(buffer, offset: offset, index: vertexBufferIndex))
+        setBinding(argumentTables.setVertexBuffer(buffer, offset: offset, index: index))
     }
 
     func setFragmentBuffer(_ buffer: MTLBuffer, offset: Int, index: Int) -> Bool {
-        guard let fragmentBufferIndex = FragmentBufferIndex(rawValue: index) else {
-            return failBinding("Unsupported Metal 4 fragment buffer index \(index).")
-        }
-        return setBinding(argumentTables.setFragmentBuffer(buffer, offset: offset, index: fragmentBufferIndex))
+        setBinding(argumentTables.setFragmentBuffer(buffer, offset: offset, index: index))
     }
 
     func setVertexTexture(_ texture: MTLTexture?, index: Int) -> Bool {
-        guard let vertexTextureIndex = VertexTextureIndex(rawValue: index) else {
-            return failBinding("Unsupported Metal 4 vertex texture index \(index).")
-        }
-        return setBinding(argumentTables.setVertexTexture(texture, index: vertexTextureIndex))
+        setBinding(argumentTables.setVertexTexture(texture, index: index))
     }
 
     func setFragmentTexture(_ texture: MTLTexture?, index: Int) -> Bool {
-        guard let fragmentTextureIndex = FragmentTextureIndex(rawValue: index) else {
-            return failBinding("Unsupported Metal 4 fragment texture index \(index).")
-        }
-        return setBinding(argumentTables.setFragmentTexture(texture, index: fragmentTextureIndex))
+        setBinding(argumentTables.setFragmentTexture(texture, index: index))
     }
 
     func setFragmentTextures(_ textures: [MTLTexture?], range: Range<Int>) -> Bool {
@@ -362,20 +350,13 @@ internal final class Metal4RenderCommandEncoder: SatinRenderCommandEncoder {
         }
         for (offset, texture) in textures.prefix(range.count).enumerated() {
             let index = range.lowerBound + offset
-            guard let fragmentTextureIndex = FragmentTextureIndex(rawValue: index) else {
-                didBindAll = failBinding("Unsupported Metal 4 fragment texture index \(index).")
-                continue
-            }
-            didBindAll = setBinding(argumentTables.setFragmentTexture(texture, index: fragmentTextureIndex)) && didBindAll
+            didBindAll = setBinding(argumentTables.setFragmentTexture(texture, index: index)) && didBindAll
         }
         return didBindAll
     }
 
     func setFragmentSamplerState(_ samplerState: MTLSamplerState?, index: Int) -> Bool {
-        guard let fragmentSamplerIndex = FragmentSamplerIndex(rawValue: index) else {
-            return failBinding("Unsupported Metal 4 fragment sampler index \(index).")
-        }
-        return setBinding(argumentTables.setFragmentSamplerState(samplerState, index: fragmentSamplerIndex))
+        setBinding(argumentTables.setFragmentSamplerState(samplerState, index: index))
     }
 
     private func setBinding(_ didBind: Bool) -> Bool {

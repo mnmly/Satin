@@ -41,7 +41,7 @@ public struct Context {
     public let velocityPixelFormat: MTLPixelFormat
     public let emissivePixelFormat: MTLPixelFormat
 
-    private let metal4SupportStorage: Any?
+    private let metal4SupportBox: Metal4SupportBox
 
     public init(
         id: UUID = UUID(),
@@ -71,13 +71,20 @@ public struct Context {
         self.device = device
         self.commandQueue = device.makeCommandQueue()!
         self.requestedBackend = requestedBackend
-        self.metal4SupportStorage = Self.makeMetal4Support(
+        // `backend` is derived from a cheap device-capability check, not from allocating the
+        // Metal 4 backend. The heavy resources (MTL4 queue, command allocators, residency sets)
+        // are built lazily on first `metal4Support` access — so the many Context copies the
+        // renderer mints purely to key pipeline compilation never allocate them. If allocation
+        // later fails on a capable device, `metal4Support` is nil and the driver falls back to
+        // an MTL3 command buffer at frame time.
+        let metal4Capable = requestedBackend == .metal4 && Self.deviceSupportsMetal4(device)
+        self.backend = metal4Capable ? .metal4 : .metal3
+        self.metal4SupportBox = Metal4SupportBox(
             device: device,
-            requestedBackend: requestedBackend,
+            enabled: metal4Capable,
             maxBuffersInFlight: maxBuffersInFlight,
             externalCommandQueue: externalMetal4CommandQueue
         )
-        self.backend = metal4SupportStorage == nil ? .metal3 : requestedBackend
         self.sampleCount = sampleCount
         self.colorPixelFormat = colorPixelFormat
         self.depthPixelFormat = depthPixelFormat
@@ -94,28 +101,14 @@ public struct Context {
         self.emissivePixelFormat = emissivePixelFormat
     }
 
-    private static func makeMetal4Support(
-        device: MTLDevice,
-        requestedBackend: MetalBackend,
-        maxBuffersInFlight: Int,
-        externalCommandQueue: Any?
-    ) -> Any? {
-        guard requestedBackend == .metal4 else { return nil }
-
+    private static func deviceSupportsMetal4(_ device: MTLDevice) -> Bool {
+        // Metal 4 features (argument tables, command allocators, residency sets) require
+        // MTLGPUFamily.metal4 — Apple7+ silicon, no Intel / AMD.
+        // See Reference/Documentations/Metal-Feature-Set-Tables.pdf p.5.
         if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
-            // Metal 4 features (argument tables, command allocators, residency sets)
-            // require MTLGPUFamily.metal4 — Apple7+ silicon, no Intel / AMD.
-            // See Reference/Documentations/Metal-Feature-Set-Tables.pdf p.5.
-            guard device.supportsFamily(.metal4) else { return nil }
-            let typedQueue = externalCommandQueue as? (any MTL4CommandQueue)
-            return Metal4Support(
-                device: device,
-                maxBuffersInFlight: maxBuffersInFlight,
-                commandQueue: typedQueue
-            )
+            return device.supportsFamily(.metal4)
         }
-
-        return nil
+        return false
     }
 
     func getDefines() -> [ShaderDefine] {
@@ -143,7 +136,46 @@ public struct Context {
 @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
 extension Context {
     internal var metal4Support: Metal4Support? {
-        metal4SupportStorage as? Metal4Support
+        metal4SupportBox.resolve() as? Metal4Support
+    }
+}
+
+/// Lazily constructs (and caches) the Metal 4 backend resources for a `Context`. Stored as a
+/// reference type so copying the `Context` value — e.g. the pipeline-compilation keys the
+/// renderer mints per render mode / output combination — shares the box and never eagerly
+/// allocates an MTL4 queue, command allocators, or residency sets. Only the `Context` actually
+/// used to submit frames materializes them, on first access.
+///
+/// Resolution happens on the render thread (via `Renderer.makeFrameCommand` /
+/// `makeFallbackCommandBuffer`) and is not synchronized; compilation-key contexts never touch it.
+private final class Metal4SupportBox {
+    private let device: MTLDevice
+    private let enabled: Bool
+    private let maxBuffersInFlight: Int
+    private let externalCommandQueue: Any?
+    private var didResolve = false
+    private var storage: Any?
+
+    init(device: MTLDevice, enabled: Bool, maxBuffersInFlight: Int, externalCommandQueue: Any?) {
+        self.device = device
+        self.enabled = enabled
+        self.maxBuffersInFlight = maxBuffersInFlight
+        self.externalCommandQueue = externalCommandQueue
+    }
+
+    func resolve() -> Any? {
+        if didResolve { return storage }
+        didResolve = true
+        guard enabled else { return nil }
+        if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
+            let typedQueue = externalCommandQueue as? (any MTL4CommandQueue)
+            storage = Metal4Support(
+                device: device,
+                maxBuffersInFlight: maxBuffersInFlight,
+                commandQueue: typedQueue
+            )
+        }
+        return storage
     }
 }
 

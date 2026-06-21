@@ -170,8 +170,8 @@ public class ARBackgroundDepthEncoder: ARBackgroundEncoder {
         renderPassDescriptor: MTLRenderPassDescriptor,
         frameCommand: any SatinFrameCommand
     ) -> Bool {
-        guard let frameCommand = frameCommand as? MetalFrameCommand else { return false }
-        draw(renderPassDescriptor: renderPassDescriptor, commandBuffer: frameCommand.commandBuffer)
+        guard let commandBuffer = frameCommand.metal3CommandBuffer else { return false }
+        draw(renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
         return true
     }
 
@@ -196,10 +196,10 @@ public class ARBackgroundDepthEncoder: ARBackgroundEncoder {
         frameCommand: any SatinFrameCommand,
         renderTarget: MTLTexture
     ) -> Bool {
-        guard let frameCommand = frameCommand as? MetalFrameCommand else { return false }
+        guard let commandBuffer = frameCommand.metal3CommandBuffer else { return false }
         draw(
             renderPassDescriptor: renderPassDescriptor,
-            commandBuffer: frameCommand.commandBuffer,
+            commandBuffer: commandBuffer,
             renderTarget: renderTarget
         )
         return true

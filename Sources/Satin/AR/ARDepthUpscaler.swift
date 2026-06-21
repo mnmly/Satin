@@ -137,9 +137,9 @@ class ARDepthUpscaler {
         cbcrTexture: MTLTexture,
         depthTexture: MTLTexture
     ) -> MTLTexture? {
-        guard let frameCommand = frameCommand as? MetalFrameCommand else { return nil }
+        guard let commandBuffer = frameCommand.metal3CommandBuffer else { return nil }
         return update(
-            commandBuffer: frameCommand.commandBuffer,
+            commandBuffer: commandBuffer,
             yTexture: yTexture,
             cbcrTexture: cbcrTexture,
             depthTexture: depthTexture

@@ -15,11 +15,11 @@ internal final class Metal4ComputeArgumentTable {
     private static let maxBufferIndex = ComputeBufferIndex.TessellationIndices.rawValue
     private static let maxTextureIndex = ComputeTextureIndex.Custom10.rawValue
 
-    // Track which slots were written since last reset using bitsets (single
-    // bitwise-OR per bind, O(used) drain on reset). Matches the optimization in
-    // Metal4ArgumentTables.
-    private var dirtyBuffers: UInt64 = 0
-    private var dirtyTextures: UInt64 = 0
+    // Track which slots were written since last reset (single mark per bind, O(used)
+    // drain on reset). Matches Metal4ArgumentTables; DirtySlotMask spans the full index
+    // range so future slot growth can't shift past a single UInt64's width.
+    private var dirtyBuffers = DirtySlotMask()
+    private var dirtyTextures = DirtySlotMask()
 
     init?(device: MTLDevice, resourceHandler: ((MTLResource) -> Void)? = nil) {
         guard let descriptor = Metal4ArgumentBindingLayout.makeArgumentTableDescriptor(
@@ -40,20 +40,9 @@ internal final class Metal4ComputeArgumentTable {
         reset()
     }
 
-    @inline(__always)
-    private static func drain(_ mask: inout UInt64, body: (Int) -> Void) {
-        var bits = mask
-        while bits != 0 {
-            let i = bits.trailingZeroBitCount
-            body(i)
-            bits &= bits &- 1
-        }
-        mask = 0
-    }
-
     private func reset() {
-        Self.drain(&dirtyBuffers) { table.setAddress(0, index: $0) }
-        Self.drain(&dirtyTextures) { table.setTexture(Self.nilResourceID, index: $0) }
+        dirtyBuffers.drain { table.setAddress(0, index: $0) }
+        dirtyTextures.drain { table.setTexture(Self.nilResourceID, index: $0) }
     }
 
     func bind(to computeEncoder: any MTL4ComputeCommandEncoder) {
@@ -62,39 +51,30 @@ internal final class Metal4ComputeArgumentTable {
 
     @discardableResult
     func setBuffer(_ buffer: MTLBuffer, offset: Int, index: ComputeBufferIndex) -> Bool {
-        guard Metal4ArgumentBindingLayout.supportsBufferIndex(index.rawValue) else { return false }
-        resourceHandler?(buffer)
-        table.setAddress(buffer.gpuAddress + MTLGPUAddress(offset), index: index.rawValue)
-        dirtyBuffers |= 1 << index.rawValue
-        return true
+        setBuffer(buffer, offset: offset, index: index.rawValue)
     }
 
     @discardableResult
     func setBuffer(_ buffer: MTLBuffer, offset: Int, index: Int) -> Bool {
-        guard Metal4ArgumentBindingLayout.supportsBufferIndex(index) else { return false }
+        guard index >= 0, index <= Self.maxBufferIndex else { return false }
         resourceHandler?(buffer)
         table.setAddress(buffer.gpuAddress + MTLGPUAddress(offset), index: index)
-        dirtyBuffers |= 1 << index
+        dirtyBuffers.mark(index)
         return true
     }
 
     @discardableResult
     func setTexture(_ texture: MTLTexture?, index: ComputeTextureIndex) -> Bool {
-        guard Metal4ArgumentBindingLayout.supportsTextureIndex(index.rawValue) else { return false }
-        guard let texture else { return true }
-        resourceHandler?(texture)
-        table.setTexture(texture.gpuResourceID, index: index.rawValue)
-        dirtyTextures |= 1 << index.rawValue
-        return true
+        setTexture(texture, index: index.rawValue)
     }
 
     @discardableResult
     func setTexture(_ texture: MTLTexture?, index: Int) -> Bool {
-        guard Metal4ArgumentBindingLayout.supportsTextureIndex(index) else { return false }
+        guard index >= 0, index <= Self.maxTextureIndex else { return false }
         guard let texture else { return true }
         resourceHandler?(texture)
         table.setTexture(texture.gpuResourceID, index: index)
-        dirtyTextures |= 1 << index
+        dirtyTextures.mark(index)
         return true
     }
 }

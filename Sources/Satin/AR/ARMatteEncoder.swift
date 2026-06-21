@@ -89,8 +89,8 @@ public class ARMatteEncoder {
 
     @discardableResult
     public func encode(frameCommand: any SatinFrameCommand) -> Bool {
-        guard let frameCommand = frameCommand as? MetalFrameCommand else { return false }
-        encode(commandBuffer: frameCommand.commandBuffer)
+        guard let commandBuffer = frameCommand.metal3CommandBuffer else { return false }
+        encode(commandBuffer: commandBuffer)
         return true
     }
 

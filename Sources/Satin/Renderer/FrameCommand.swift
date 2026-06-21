@@ -10,17 +10,29 @@ import Metal
 public protocol SatinFrameCommand: AnyObject {
     var backend: MetalBackend { get }
     var frameIndex: Int { get }
+
+    /// The classic Metal 3 command buffer, or nil on the Metal 4 backend. Use this in per-frame
+    /// encoders that depend on `MTLCommandBuffer`-only APIs (e.g. Metal Performance Shaders):
+    /// `guard let commandBuffer = frameCommand.metal3CommandBuffer else { return }`.
+    var metal3CommandBuffer: MTLCommandBuffer? { get }
 }
 
 internal protocol SatinCommittableFrameCommand: SatinFrameCommand {
     func commit()
     func commit(onCompleted: (() -> Void)?)
+
+    /// Build a backend-appropriate `RenderEncoderState` for the given pass descriptor, or nil
+    /// if the encoder/argument tables can't be created. Keeps the Metal 3 vs Metal 4 branch
+    /// (and its availability gating) on the concrete frame command instead of at call sites.
+    func makeRenderEncoderState(descriptor: MTLRenderPassDescriptor) -> RenderEncoderState?
 }
 
 internal final class MetalFrameCommand: SatinCommittableFrameCommand {
     let backend: MetalBackend = .metal3
     let frameIndex: Int
     let commandBuffer: MTLCommandBuffer
+
+    var metal3CommandBuffer: MTLCommandBuffer? { commandBuffer }
 
     init(frameIndex: Int, commandBuffer: MTLCommandBuffer) {
         self.frameIndex = frameIndex
@@ -39,6 +51,13 @@ internal final class MetalFrameCommand: SatinCommittableFrameCommand {
         }
         commandBuffer.commit()
     }
+
+    func makeRenderEncoderState(descriptor: MTLRenderPassDescriptor) -> RenderEncoderState? {
+        guard let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else {
+            return nil
+        }
+        return RenderEncoderState(renderEncoder: renderEncoder)
+    }
 }
 
 @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
@@ -49,6 +68,10 @@ internal final class Metal4FrameCommand: SatinCommittableFrameCommand {
     let commandQueue: any MTL4CommandQueue
     let commandBuffer: any MTL4CommandBuffer
     let commandAllocator: any MTL4CommandAllocator
+
+    // No classic command buffer on the Metal 4 backend; MPS-style MTL3-only encoders use this
+    // to detect and skip (or fall back) cleanly.
+    var metal3CommandBuffer: MTLCommandBuffer? { nil }
     private let residencySet: (any MTLResidencySet)?
     private let argumentTablePool: Metal4ArgumentTablePool
     // Signalled from the commit feedback handler after the GPU finishes using this
@@ -109,6 +132,14 @@ internal final class Metal4FrameCommand: SatinCommittableFrameCommand {
 
     func makeRenderArgumentTables() -> Metal4ArgumentTables? {
         argumentTablePool.makeRenderArgumentTables(frameSlot: frameSlot, resourceHandler: useResource)
+    }
+
+    func makeRenderEncoderState(descriptor: MTLRenderPassDescriptor) -> RenderEncoderState? {
+        let metal4Descriptor = Metal4RenderPassBridge.makeDescriptor(from: descriptor)
+        guard let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: metal4Descriptor),
+              let argumentTables = makeRenderArgumentTables()
+        else { return nil }
+        return RenderEncoderState(metal4RenderEncoder: renderEncoder, argumentTables: argumentTables)
     }
 
     func makeComputeArgumentTable() -> Metal4ComputeArgumentTable? {

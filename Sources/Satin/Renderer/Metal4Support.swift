@@ -10,6 +10,10 @@ import Metal
 @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
 internal final class Metal4Support {
     let commandQueue: any MTL4CommandQueue
+    // A single MTL4 command buffer reused across frames (per-slot allocators back its transient
+    // storage). This serializes CPU-side encoding: frame N must `endCommandBuffer` before frame
+    // N+1 can `beginCommandBuffer`, so it forecloses Metal 4's multi-threaded command encoding.
+    // Moving to per-frame (or per-thread) command buffers is the prerequisite for parallel encode.
     let commandBuffer: any MTL4CommandBuffer
     let commandAllocators: [any MTL4CommandAllocator]
     let residencySets: [any MTLResidencySet]

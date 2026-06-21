@@ -503,8 +503,8 @@ open class Material: Codable {
     /// commands to `encode(_:)`; Metal 4 commands are a no-op. Override on subclasses
     /// that need per-frame compute work that should run on both backends.
     open func encode(frameCommand: any SatinFrameCommand) {
-        if let frameCommand = frameCommand as? MetalFrameCommand {
-            encode(frameCommand.commandBuffer)
+        if let commandBuffer = frameCommand.metal3CommandBuffer {
+            encode(commandBuffer)
         }
     }
 

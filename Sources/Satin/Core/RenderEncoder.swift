@@ -534,12 +534,8 @@ open class RenderEncoder {
     ) -> Bool {
         lastFrameCommandDrawFailure = nil
 
-        if !(frameCommand is MetalFrameCommand) {
-            if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *), frameCommand is Metal4FrameCommand {
-                // OK
-            } else {
-                return failFrameCommandDraw("Unsupported frame command backend: \(frameCommand.backend).")
-            }
+        guard frameCommand is any SatinCommittableFrameCommand else {
+            return failFrameCommandDraw("Unsupported frame command backend: \(frameCommand.backend).")
         }
 
         _drawScene(
@@ -1516,25 +1512,9 @@ open class RenderEncoder {
         viewMappings: [MTLVertexAmplificationViewMapping],
         failureReason: String
     ) -> RenderEncoderState? {
-        let state: RenderEncoderState
-        if let frameCommand = frameCommand as? MetalFrameCommand {
-            guard let renderEncoder = frameCommand.commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) else {
-                failFrameCommandDraw(failureReason)
-                return nil
-            }
-            state = RenderEncoderState(renderEncoder: renderEncoder)
-        } else if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
-                  let frameCommand = frameCommand as? Metal4FrameCommand
-        {
-            let metal4Descriptor = Metal4RenderPassBridge.makeDescriptor(from: renderPassDescriptor)
-            guard let renderEncoder = frameCommand.commandBuffer.makeRenderCommandEncoder(descriptor: metal4Descriptor),
-                  let argumentTables = frameCommand.makeRenderArgumentTables()
-            else {
-                failFrameCommandDraw(failureReason)
-                return nil
-            }
-            state = RenderEncoderState(metal4RenderEncoder: renderEncoder, argumentTables: argumentTables)
-        } else {
+        guard let committable = frameCommand as? any SatinCommittableFrameCommand,
+              let state = committable.makeRenderEncoderState(descriptor: renderPassDescriptor)
+        else {
             failFrameCommandDraw(failureReason)
             return nil
         }

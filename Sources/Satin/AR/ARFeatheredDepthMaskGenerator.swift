@@ -79,9 +79,9 @@ public class ARFeatheredDepthMaskGenerator {
     }
 
     public func encode(frameCommand: any SatinFrameCommand, realDepthTexture: MTLTexture, virtualDepthTexture: MTLTexture) -> MTLTexture? {
-        guard let frameCommand = frameCommand as? MetalFrameCommand else { return nil }
+        guard let commandBuffer = frameCommand.metal3CommandBuffer else { return nil }
         return encode(
-            commandBuffer: frameCommand.commandBuffer,
+            commandBuffer: commandBuffer,
             realDepthTexture: realDepthTexture,
             virtualDepthTexture: virtualDepthTexture
         )

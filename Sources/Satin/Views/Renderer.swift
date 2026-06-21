@@ -177,8 +177,8 @@ open class Renderer {
 
     @discardableResult
     open func draw(renderPassDescriptor: MTLRenderPassDescriptor, frameCommand: any SatinFrameCommand) -> Bool {
-        guard let frameCommand = frameCommand as? MetalFrameCommand else { return false }
-        draw(renderPassDescriptor: renderPassDescriptor, commandBuffer: frameCommand.commandBuffer)
+        guard let commandBuffer = frameCommand.metal3CommandBuffer else { return false }
+        draw(renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
         return true
     }
 

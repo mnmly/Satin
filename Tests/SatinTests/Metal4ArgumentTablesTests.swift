@@ -34,6 +34,40 @@ final class Metal4ArgumentTablesTests: XCTestCase {
         XCTAssertFalse(tables.setFragmentSamplerState(samplerState, index: .Custom16))
     }
 
+    func testFragmentTexturesBindAcrossFullDirectShadowRange() throws {
+        guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) else {
+            throw XCTSkip("Metal 4 argument tables require OS 26 SDK runtime support.")
+        }
+
+        let device = try XCTUnwrap(MTLCreateSystemDefaultDevice())
+        guard let tables = Metal4ArgumentTables(device: device) else {
+            throw XCTSkip("Metal 4 argument tables are not available on this device.")
+        }
+
+        let textureDescriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba8Unorm,
+            width: 1,
+            height: 1,
+            mipmapped: false
+        )
+        let texture = try XCTUnwrap(device.makeTexture(descriptor: textureDescriptor))
+
+        // Every directional-shadow slot must bind, including indices past 63 that the old
+        // 42-slot table and single-UInt64 dirty mask could not represent.
+        let firstShadow = FragmentTextureIndex.DirectShadow0.rawValue
+        let lastShadow = firstShadow + maxShadowTextures - 1
+        for index in firstShadow ... lastShadow {
+            XCTAssertTrue(
+                tables.setFragmentTexture(texture, index: index),
+                "expected bind at fragment texture index \(index)"
+            )
+        }
+
+        // One past the table capacity fails cleanly (returns false, no crash) so it trips the
+        // Metal 3 fallback rather than a Metal range-validation error.
+        XCTAssertFalse(tables.setFragmentTexture(texture, index: Metal4ArgumentBindingLayout.maxFragmentTextureBindCount))
+    }
+
     func testMetal4ArgumentTablesReportBoundResourcesForResidency() throws {
         guard #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) else {
             throw XCTSkip("Metal 4 argument tables require OS 26 SDK runtime support.")

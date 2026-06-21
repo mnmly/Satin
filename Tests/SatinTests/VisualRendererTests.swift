@@ -324,7 +324,7 @@ final class VisualRendererTests: XCTestCase {
         )
     }
 
-    // TODO: Ideally have good small ref HDRI 
+    // TODO: Ideally have good small ref HDRI
 //    func testSkyboxIBLMatchesReference() throws {
 //        let image = try VisualTestHarness.render(size: SIMD2(224, 192)) { renderer, camera in
 //            let device = renderer.context.device

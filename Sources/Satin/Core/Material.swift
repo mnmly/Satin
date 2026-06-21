@@ -525,9 +525,9 @@ open class Material: Codable {
         }
     }
 
-    open func bindDepthStates(renderContext: Context, renderEncoderState: RenderEncoderState) {
+    open func bindDepthStates(renderContext: Context, renderEncoderState: RenderEncoderState, shadow: Bool = false) {
         guard renderContext.depthPixelFormat != .invalid else { return }
-        renderEncoderState.depthStencilState = renderContext.alphaOitEnabled ? alphaOitDepthStencilState : depthStencilState
+        renderEncoderState.depthStencilState = (!shadow && renderContext.alphaOitEnabled) ? alphaOitDepthStencilState : depthStencilState
         renderEncoderState.depthBias = depthBias
         renderEncoderState.depthClipMode = depthClipMode
     }
@@ -600,7 +600,8 @@ open class Material: Codable {
         bindUniforms(renderEncoderState: renderEncoderState, shadow: shadow)
         bindDepthStates(
             renderContext: renderContext,
-            renderEncoderState: renderEncoderState
+            renderEncoderState: renderEncoderState,
+            shadow: shadow
         )
         bindBuffers(renderEncoderState: renderEncoderState)
         bindTextures(renderEncoderState: renderEncoderState)
